@@ -15,7 +15,7 @@ def egcd(a, b):
 # FiniteField operations
 
 def ff_neg(x, m):
-    return x % m
+    return (-x) % m
     
 def ff_add(x, y, m):
     return (x + y) % m
@@ -42,6 +42,12 @@ class Point:
     def __repr__(self) -> str:
         return "(x = {}, y = {})".format(self.x, self.y)
 
+    def identity():
+        return Point(0, 0) # do not work for y^2 = x^3
+
+    def isIdentity(self):
+        return self.x == 0 and self.y == 0
+
 class Curve:
     def __init__(self, a, b, m):
         self.a = a
@@ -49,6 +55,9 @@ class Curve:
         self.m = m
 
     def isOnCurve(self, p):
+        if p.isIdentity():
+            return True
+
         x3 = ff_mul(ff_mul(p.x, p.x, self.m), p.x, self.m)
         ax = ff_mul(self.a, p.x, self.m)
         rhs = ff_add(ff_add(x3, ax, self.m), self.b, self.m)
@@ -59,6 +68,17 @@ class Curve:
         assert self.isOnCurve(p)
         assert self.isOnCurve(q)
 
+        if p.isIdentity():
+            return q
+        elif q.isIdentity():
+            return p
+
+        if p.x == q.x:
+            if p.y == q.y:
+                return self.double(p)
+            else:
+                return Point.identity()
+
         l = ff_div(ff_sub(p.y, q.y, self.m), ff_sub(p.x, q.x, self.m), self.m)
         u = ff_sub(p.y, ff_mul(l, p.x, self.m), self.m)
         x = ff_sub(ff_sub(ff_mul(l, l, self.m), p.x, self.m), q.x, self.m)
@@ -66,6 +86,9 @@ class Curve:
         return Point(x, y)
 
     def double(self, p):
+        if p.isIdentity():
+            return p
+
         l = ff_div(ff_add(ff_mul(3, ff_mul(p.x, p.x, self.m), self.m), self.a, self.m), ff_mul(2, p.y, self.m), self.m)
         u = ff_sub(p.y, ff_mul(l, p.x, self.m), self.m)
         x = ff_sub(ff_mul(l, l, self.m), ff_mul(2, p.x, self.m), self.m)
@@ -111,13 +134,18 @@ def curve_test():
     p4 = c.double(p)
     print(p4, c.isOnCurve(p4))
 
-# def generator_test():
-#     c = Curve(4, 3, 11)  # y^2 = x^3 + 4x + 3 over F_13
-#     g = Point(0, 5)
-#     print(c.add(Point(5, 7), Point(0, 5)))
-#     print(c.double(Point(5, 7)))
-#     for i in range(1, 11):
-#         print("{} G = {}, on curve = {}".format(i, c.ntimes(g, i), c.isOnCurve(c.ntimes(g, i))))
+    c = Curve(5, 7, 23)
+    print(Point(2, 5), c.isOnCurve(Point(2, 5)))
+    print(Point(12, 1), c.isOnCurve(Point(12, 1)))
+    print(c.add(Point(2, 5), Point(12, 1)))
+
+def generator_test():
+    c = Curve(4, 3, 11)  # y^2 = x^3 + 4x + 3 over F_13
+    g = Point(0, 5)
+    print(c.add(Point(5, 7), Point(0, 5)))
+    print(c.double(Point(5, 7)))
+    for i in range(1, 13):
+        print("{} G = {}, on curve = {}".format(i, c.ntimes(g, i), c.isOnCurve(c.ntimes(g, i))))
     
     
 ff_test()

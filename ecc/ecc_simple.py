@@ -96,6 +96,7 @@ class Curve:
         return Point(x, y)
 
     def ntimes(self, p, n):
+        # evaulate p + p + ... + p (n p's)
         assert n > 0
         s = None
         x = p
@@ -108,6 +109,19 @@ class Curve:
             n = n // 2
             x = self.double(x)
         return s
+
+    def npow(self, p, n, i, order):
+        # evaluate n^i p
+        
+        # evaulate n^i with order
+        s = 1
+        x = n
+        while i != 0:
+            if (i % 2) == 1:
+                s = (s * x) % order
+            i = i // 2
+            x = (x * x) % order
+        return self.ntimes(p, s)
 
 
 def ff_test():
@@ -146,8 +160,39 @@ def generator_test():
     print(c.double(Point(5, 7)))
     for i in range(1, 13):
         print("{} G = {}, on curve = {}".format(i, c.ntimes(g, i), c.isOnCurve(c.ntimes(g, i))))
+
+def generator_test1():
+    c = Curve(1, 1, 101)
+    g = Point(47, 12)
+    assert c.isOnCurve(g)
+    x = Point.identity()
+    for i in range(1, 106):
+        x = c.add(x, g)
+        print("{} G = {}, on curve = {}".format(i, x, c.isOnCurve(x)))
+
+def secp_256_test():
+    c = Curve(-3, 41058363725152142129326129780047268409114441015993725554835256314039467401291, 115792089210356248762697446949407573530086143415290314195533631308867097853951)
+    # order 115792089210356248762697446949407573529996955224135760342422259061068512044369
+    g = Point(48439561293906451759052585252797914202762949526041747995844080717082404635286, 36134250956749795798585127919587881956611106672985015071877198253568414405109)
+    print(c.isOnCurve(g))
+
+def trusted_setup_test():
+    # use secp256 curve
+    c = Curve(-3, 41058363725152142129326129780047268409114441015993725554835256314039467401291, 115792089210356248762697446949407573530086143415290314195533631308867097853951)
+    order = 115792089210356248762697446949407573529996955224135760342422259061068512044369
+    g = Point(48439561293906451759052585252797914202762949526041747995844080717082404635286, 36134250956749795798585127919587881956611106672985015071877198253568414405109)
+    # random secret
+    s = 89128395972649298573498716256466745
+    print(c.npow(g, s, 1, order))
+    print(c.npow(g, s, 2, order))
+    print(c.npow(g, s, 3, order))
+    print(c.npow(g, s, 4, order))
+
     
     
 ff_test()
 curve_test()
 generator_test()
+generator_test1()
+secp_256_test()
+trusted_setup_test()

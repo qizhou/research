@@ -200,7 +200,7 @@ class JacobianPoint:
             + self.x.__str__()
             + ", y="
             + self.y.__str__()
-            + "z="
+            + ", z="
             + self.z.__str__()
             + ", i="
             + str(self.infinity)

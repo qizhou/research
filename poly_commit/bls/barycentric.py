@@ -3,10 +3,9 @@ from ec import (G1FromBytes, G1Generator, G1Infinity, G2FromBytes, G2Generator,
                 sign_Fq2, twist, untwist, y_for_x)
 from fields import Fq
 from pairing import ate_pairing
+from poly_commit import poly_interp, get_single_proof, poly_eval
 
 from functools import reduce
-
-g1 = G1Generator()
 
 order = 13
 
@@ -27,3 +26,50 @@ roots = [Fq(order, primitive) ** (i * (order - 1) // nroots)  for i in range(nro
 x = Fq(order, 14)
 y = reduce(lambda x, y: x * y, [x - r for r in roots])
 print(y, x ** nroots - Fq(order, 1))
+
+def print_lagrange_denum(roots):
+    for i in range(len(roots)):
+        x = Fq(roots[0].Q, 1)
+        for j in range(len(roots)):
+            if i == j:
+                continue
+            x = x * (roots[i] - roots[j])
+        print(Fq(roots[0].Q, 1) / x)
+
+g1 = G1Generator()
+g2 = G2Generator()
+
+# secret of trusted setup
+secret = Fq(order, 87362938561938363821)
+
+# vec = [51234, 28374, 62734, 19823, 571763, 83746, 198384, 827512]
+vec = [51234, 28374]
+nroots = len(vec)
+primitive = 7
+roots = [Fq(order, primitive) ** (i * (order - 1) // nroots)  for i in range(nroots)]
+
+# convert it to BLS field
+vec = [Fq(order, x) for x in vec]
+coeffs = poly_interp(vec, roots)
+
+print(poly_eval(coeffs, secret))
+
+print((secret ** nroots - Fq(order, 1)) * reduce(lambda x, y: x + y, [x * y / (secret - x) for x, y in zip(roots, vec)]) / Fq(order, nroots))
+
+# # s^i secrec vector, which is available to everybody (and cannot infer s)
+# sec_vec = [g1 * (secret ** i) for i in range(len(vec) + 1)]
+# commit0 = sum(s * c for s, c in zip(sec_vec, coeffs))
+# commit = (sec_vec[nroots] + g1.negate())
+# print("commitment is", commit)
+
+# z = 1
+# # proof
+# qs = get_single_proof(coeffs, sec_vec, z, vec[z])
+# sz2 = g2 * secret + (g2 * z).negate()
+# pair0 = ate_pairing(qs, sz2)
+# print(pair0)
+
+# cy = commit + (g1 * vec[z]).negate()
+# pair1 = ate_pairing(cy, g2)
+# print(pair1)
+# assert pair0 == pair1

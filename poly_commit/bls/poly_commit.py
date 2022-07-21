@@ -61,7 +61,7 @@ def poly_interp(vec, x = None):
 def get_single_proof(coeffs, sec_vec, z, y):
     px = coeffs[:]
     px[0] = px[0] - y
-    qx, rem = poly_div(px, [-Fq(order, z), Fq(order, 1)])
+    qx, rem = poly_div(px, [-z, Fq(order, 1)])
     assert rem == [Fq(order, 0)]
     qs = sum(s * c for s, c in zip(sec_vec[0:len(qx)], qx))
     return qs
@@ -82,7 +82,7 @@ def proof_example():
 
     z = 1
     # proof
-    qs = get_single_proof(coeffs, sec_vec, z, vec[z])
+    qs = get_single_proof(coeffs, sec_vec, Fq(order, z), vec[z])
     sz2 = g2 * secret + (g2 * z).negate()
     pair0 = ate_pairing(qs, sz2)
     print(pair0)

@@ -13,7 +13,7 @@ g1 = G1Generator()
 g2 = G2Generator()
 order = default_ec.n
 
- # secret of trusted setup
+# secret of trusted setup
 secret = Fq(order, 87362938561938363821)
 nroots = 16
 primitive = 7

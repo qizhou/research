@@ -52,15 +52,20 @@ roots = [Fq(order, primitive) ** (i * (order - 1) // nroots)  for i in range(nro
 vec = [Fq(order, x) for x in vec]
 coeffs = poly_interp(vec, roots)
 
+# evaluate the polynomial using coefficient form
 print(poly_eval(coeffs, secret))
-
+# evaluate the polynomial using evaluation form
 print((secret ** nroots - Fq(order, 1)) * reduce(lambda x, y: x + y, [x * y / (secret - x) for x, y in zip(roots, vec)]) / Fq(order, nroots))
 
-# # s^i secrec vector, which is available to everybody (and cannot infer s)
-# sec_vec = [g1 * (secret ** i) for i in range(len(vec) + 1)]
-# commit0 = sum(s * c for s, c in zip(sec_vec, coeffs))
-# commit = (sec_vec[nroots] + g1.negate())
-# print("commitment is", commit)
+# s^i secrec vector, which is available to everybody (and cannot infer s)
+sec_vec = [g1 * (secret ** i) for i in range(len(vec) + 1)]
+# evaluate the commitment using trusted G1 setup
+commit0 = sum(s * c for s, c in zip(sec_vec, coeffs))
+
+# evaluate the commitment using trusted Lagrange setup
+sec_roots = [(secret ** nroots - Fq(order, 1)) * w / Fq(order, nroots) / (secret - w) * g1 for w in roots]
+commit1 = sum(s * y for s, y in zip(sec_roots, vec))
+print("commitment is equal", commit0 == commit1)
 
 # z = 1
 # # proof

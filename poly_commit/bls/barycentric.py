@@ -7,6 +7,8 @@ from poly_commit import poly_interp, get_single_proof, poly_eval
 
 from functools import reduce
 
+from evaluation_form import eval_poly_in_eval_form
+
 order = 13
 
 nroots = 3

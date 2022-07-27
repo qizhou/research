@@ -17,3 +17,17 @@ def commitment_in_eval_form(lagrange_setup, mus):
 def single_proof_in_eval_form(lagrange_setup, mus, roots, x, y):
     # Obtain the proof polynomial evaluated at a trusted setup secret
     return sum([(mu - y) / (root - x) * l for mu, root, l in zip(mus, roots, lagrange_setup)])
+
+def reverse_bit(x, nbits):
+    y = 0
+    for i in range(nbits):
+        y = y << 1
+        y |= (x & 1)
+        x = x >> 1
+    return y
+
+def reverse_bit_order(nbits):
+    l = []
+    for i in range(2 ** nbits):
+        l.append(reverse_bit(i, nbits))
+    return l

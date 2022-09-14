@@ -1,10 +1,10 @@
 import random, time
+import cProfile
 
 from py_ecc import optimized_bls12_381 as b
 from imported.kzg_proofs import get_root_of_unity, list_to_reverse_bit_order
 from imported.fft import fft
 from imported.poly_utils import PrimeField
-
 
 # number of samples after encoding
 n_samples = 128
@@ -46,6 +46,10 @@ xs = [pf.exp(root_of_unity, x) for i in selected for x in rbo[i*n_elements_ps:(i
 ys = [x for i in selected for x in row[i*n_elements_ps:(i+1)*n_elements_ps]]
 
 start_time = time.monotonic()
+pr = cProfile.Profile()
+pr.enable()
 coeffs_rec = pf.lagrange_interp(xs, ys)
-print("used time: {} s".format(time.monotonic() - start_time))
 assert coeffs == coeffs_rec
+print("used time: {} s".format(time.monotonic() - start_time))
+pr.disable()
+pr.print_stats(sort="calls")

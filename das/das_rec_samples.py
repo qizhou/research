@@ -33,9 +33,9 @@ blobs = [random.randint(0, modulus - 1) for i in range(n_blobs)]
 coeffs = fft(list_to_reverse_bit_order(blobs), modulus, root_of_unity2, True)
 
 # encoded row data
-row_raw = fft(coeffs + [0] * n_blobs, modulus, root_of_unity, False)
-row = list_to_reverse_bit_order(row_raw)
-assert row[0:n_blobs] == blobs
+y_row_raw = fft(coeffs + [0] * n_blobs, modulus, root_of_unity, False)
+y_row = list_to_reverse_bit_order(y_row_raw)
+assert y_row[0:n_blobs] == blobs
 
 # randomly select n // 2 data that are available
 selected = [i for i in range(n_samples)]
@@ -45,8 +45,9 @@ selected = selected[0:n_samples // 2]
 
 # lagrange interploation with available samples (not optimized)
 rbo = list_to_reverse_bit_order([i for i in range(n_elements)])
-xs = [pf.exp(root_of_unity, x) for i in selected for x in rbo[i*n_elements_ps:(i+1)*n_elements_ps]]
-ys = [x for i in selected for x in row[i*n_elements_ps:(i+1)*n_elements_ps]]
+x_row = [pf.exp(root_of_unity, x) for x in rbo]
+xs = [x for i in selected for x in x_row[i*n_elements_ps:(i+1)*n_elements_ps]]
+ys = [x for i in selected for x in y_row[i*n_elements_ps:(i+1)*n_elements_ps]]
 
 start_time = time.monotonic()
 if profiling:
@@ -59,15 +60,63 @@ if profiling:
     pr.disable()
     pr.print_stats(sort="calls")
 
-# reconstruct the rest samples (note that recovering (at most) half of the rest is enough)
-nxs = [pf.exp(root_of_unity, x) for i in missing for x in rbo[i*n_elements_ps:(i+1)*n_elements_ps]]
-nys = [x for i in missing for x in row[i*n_elements_ps:(i+1)*n_elements_ps]]
+# reconstruct the rest samples natively (note that recovering (at most) half of the rest is enough)
+nxs = [x for i in missing for x in x_row[i*n_elements_ps:(i+1)*n_elements_ps]]
+nys = [x for i in missing for x in y_row[i*n_elements_ps:(i+1)*n_elements_ps]]
 
 start_time = time.monotonic()
 if profiling:
     pr = cProfile.Profile()
     pr.enable()
 nys_rec = pf.evaluate_polynomial_in_lagrange_interp_form(ys, xs, nxs)
+assert nys == nys_rec
+print("All sample recovery used time: {} s".format(time.monotonic() - start_time))
+if profiling:
+    pr.disable()
+    pr.print_stats(sort="calls")
+
+# reconstruct the rest samples using coset information
+def evaluate_polynomial_in_lagrange_interp_form_with_coset(self, ys, xs, rus, nxs):
+    # n - number of elements per sample (i.e., order of each coset)
+
+    n = len(rus)
+    ni = self.inv(n)
+
+    hns = [self.exp(x, n) for x in xs[::n]]
+    hn1s = [self.exp(x, n - 1) for x in xs[::n]]
+
+    # Generate master numerator polynomial, eg. (x - x1) * (x - x2) * ... * (x - xn)
+    root = self.zpoly(hns)
+
+    # evaluate y * denominators
+    ygs = []
+    for i in range(len(hns)):
+        di = 1
+        for j in range(len(hns)):
+            if i == j:
+                continue
+            di = self.mul(di, (hns[i] - hns[j]))
+        d = self.div(ni, di)
+        d = self.div(d, hn1s[i])
+
+        for j in range(n):
+            ygs.append(self.mul(self.mul(ys[i*n+j], d), rus[j]))
+
+    nys = []
+    # batch inverse the single denominators for each basis
+    invdenoms = self.multi_inv([nx - x for nx in nxs for x in xs])
+    for i in range(len(nxs)):
+        v = sum(x * y for x, y in zip(invdenoms[i*len(xs):(i+1)*len(xs)], ygs))
+        ny = self.mul(self.eval_poly_at(root, self.exp(nxs[i], n)), v)
+        nys.append(ny)
+
+    return nys
+
+start_time = time.monotonic()
+if profiling:
+    pr = cProfile.Profile()
+    pr.enable()
+nys_rec = evaluate_polynomial_in_lagrange_interp_form_with_coset(pf, ys, xs, x_row[0:n_elements_ps],  nxs)
 assert nys == nys_rec
 print("All sample recovery used time: {} s".format(time.monotonic() - start_time))
 if profiling:

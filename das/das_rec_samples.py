@@ -6,6 +6,8 @@ from imported.kzg_proofs import get_root_of_unity, list_to_reverse_bit_order
 from imported.fft import fft
 from imported.poly_utils import PrimeField
 
+profiling = True
+
 # number of samples after encoding
 n_samples = 512
 
@@ -38,6 +40,7 @@ assert row[0:n_blobs] == blobs
 # randomly select n // 2 data that are available
 selected = [i for i in range(n_samples)]
 random.shuffle(selected)
+missing = selected[n_samples // 2:]
 selected = selected[0:n_samples // 2]
 
 # lagrange interploation with available samples (not optimized)
@@ -46,11 +49,27 @@ xs = [pf.exp(root_of_unity, x) for i in selected for x in rbo[i*n_elements_ps:(i
 ys = [x for i in selected for x in row[i*n_elements_ps:(i+1)*n_elements_ps]]
 
 start_time = time.monotonic()
-pr = cProfile.Profile()
-pr.enable()
+if profiling:
+    pr = cProfile.Profile()
+    pr.enable()
 coeffs_rec = pf.lagrange_interp(xs, ys)
 assert coeffs == coeffs_rec
-print("used time: {} s".format(time.monotonic() - start_time))
-pr.disable()
-pr.print_stats(sort="calls")
+print("Coefficient recovery used time: {} s".format(time.monotonic() - start_time))
+if profiling:
+    pr.disable()
+    pr.print_stats(sort="calls")
 
+# reconstruct the rest samples (note that recovering (at most) half of the rest is enough)
+nxs = [pf.exp(root_of_unity, x) for i in missing for x in rbo[i*n_elements_ps:(i+1)*n_elements_ps]]
+nys = [x for i in missing for x in row[i*n_elements_ps:(i+1)*n_elements_ps]]
+
+start_time = time.monotonic()
+if profiling:
+    pr = cProfile.Profile()
+    pr.enable()
+nys_rec = pf.evaluate_polynomial_in_lagrange_interp_form(ys, xs, nxs)
+assert nys == nys_rec
+print("All sample recovery used time: {} s".format(time.monotonic() - start_time))
+if profiling:
+    pr.disable()
+    pr.print_stats(sort="calls")

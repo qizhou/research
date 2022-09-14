@@ -55,6 +55,35 @@ class PrimeField():
 
         return r
 
+    def evaluate_polynomial_in_lagrange_interp_form(self, ys, xs, nxs):
+        # Generate master numerator polynomial, eg. (x - x1) * (x - x2) * ... * (x - xn)
+        root = self.zpoly(xs)
+        assert len(root) == len(ys) + 1
+
+        # equation
+        # f(x) = p(x) \sum_i y_i g_i / (x - x_i)
+        # g_i = \prod_{j \neq i} x_i - x_j
+
+        # evaluate y * denominators
+        ygs = ys[:]
+        for i in range(len(ygs)):
+            di = 1
+            for j in range(len(ygs)):
+                if i == j:
+                    continue
+                di = self.mul(di, (xs[i] - xs[j]))
+            ygs[i] = self.div(ygs[i], di)
+
+        nys = []
+        # batch inverse the single denominators for each basis
+        invdenoms = self.multi_inv([nx - x for nx in nxs for x in xs])
+        for i in range(len(nxs)):
+            v = sum(x * y for x, y in zip(invdenoms[i*len(xs):(i+1)*len(xs)], ygs))
+            ny = self.mul(self.eval_poly_at(root, nxs[i]), v)
+            nys.append(ny)
+
+        return nys
+
 
     def barycentric_formula_constants(self, z):
         """

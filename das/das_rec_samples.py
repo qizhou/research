@@ -7,7 +7,7 @@ from imported.fft import fft
 from imported.poly_utils import PrimeField
 
 # number of samples after encoding
-n_samples = 128
+n_samples = 512
 
 # number of field elements per sample
 n_elements_ps = 16
@@ -53,3 +53,4 @@ assert coeffs == coeffs_rec
 print("used time: {} s".format(time.monotonic() - start_time))
 pr.disable()
 pr.print_stats(sort="calls")
+

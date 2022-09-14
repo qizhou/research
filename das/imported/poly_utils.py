@@ -178,12 +178,12 @@ class PrimeField():
         diff = apos - bpos
         while diff >= 0:
             quot = self.div(a[apos], b[bpos])
-            o.insert(0, quot)
+            o.append(quot)
             for i in range(bpos, -1, -1):
                 a[diff+i] -= b[i] * quot
             apos -= 1
             diff -= 1
-        return [x % self.MODULUS for x in o]
+        return [x % self.MODULUS for x in reversed(o)]
 
     def mod_polys(self, a, b):
         return self.sub_polys(a, self.mul_polys(b, self.div_polys(a, b)))[:len(b)-1]

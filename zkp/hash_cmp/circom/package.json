@@ -1,0 +1,20 @@
+{
+  "name": "zk-hash",
+  "version": "1.0.0",
+  "license": "MIT",
+  "scripts": {
+    "build:sha256": "cd ./scripts/build && sh ./build.sh sha256",
+    "build:poseidon256": "cd ./scripts/build && sh ./build.sh poseidon256"
+  },
+  "dependencies": {
+    "circomlib": "^2.0.5"
+  },
+  "devDependencies": {
+    "@ethereumjs/util": "^8.0.0",
+    "circomlibjs": "^0.1.7",
+    "elliptic": "^6.5.4",
+    "eslint": "^8.23.1",
+    "prettier": "^2.7.1",
+    "snarkjs": "^0.5.0"
+  }
+}

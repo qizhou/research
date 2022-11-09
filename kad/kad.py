@@ -18,12 +18,8 @@ def count_bits(v):
     return n
 
 
-def log_dist(id0, id1):
-    assert len(id0) == len(id1)
-    return sum([count_bits(b0 ^ b1) for b0, b1 in zip(id0, id1)])
-
-
-def distance(id0, id1):
+# log2(id0 ^ id1)
+def log_distance(id0, id1):
     """ Find the n where first n - 1 are common bit prefix of ids """
     v = id0 ^ id1
     d = 0
@@ -42,7 +38,7 @@ class Node:
         return Node(random.randint(0, ID_MAX))
 
     def addNode(self, node):
-        dist = distance(self.id, node.id) - 1
+        dist = log_distance(self.id, node.id) - 1
 
         if len(self.routingTable[dist]) < K:
             self.routingTable[dist].append(node)
@@ -53,7 +49,7 @@ class Node:
     def findNode(self, key):
         # Implemement FIND_NODE RPC, which returns top K nodes to the key
         pq = []
-        dist = distance(self.id, key)
+        dist = log_distance(self.id, key)
         if dist == 0:
             return self
 
@@ -62,7 +58,7 @@ class Node:
         # TODO: could we optimize the search without iterate all nodes?
         for i in range(ID_BIT_SIZE):
             for n in self.routingTable[i]:
-                dist0 = distance(key, n.id)
+                dist0 = log_distance(key, n.id)
                 if dist0 >= dist:
                     continue
                 if dist0 == 0:
@@ -78,7 +74,7 @@ class Node:
         # Repeated find the node of the key
         pq = []
         visited = set()
-        dist = distance(self.id, key)
+        dist = log_distance(self.id, key)
         if dist == 0:
             return self
 

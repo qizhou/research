@@ -4,7 +4,8 @@
   "license": "MIT",
   "scripts": {
     "build:sha256": "cd ./scripts/build && sh ./build.sh sha256",
-    "build:poseidon256": "cd ./scripts/build && sh ./build.sh poseidon256"
+    "build:poseidon256": "cd ./scripts/build && sh ./build.sh poseidon256",
+    "prove:poseidon256": "cd ./scripts/build && sh ./prove.sh poseidon256"
   },
   "dependencies": {
     "circomlib": "^2.0.5"

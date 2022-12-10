@@ -38,7 +38,7 @@ echo "DONE ($((end-start))s)"
 
 echo "****GENERATING VERIFICATION KEY****"
 start=`date +%s`
-NODE_OPTIONS="--max-old-space-size=56000" npx snarkjs zkey export verificationkey  "$BUILD_DIR"/"$CIRCUIT_NAME".zkey "$BUILD_DIR"/verification_key.json
+NODE_OPTIONS="--max-old-space-size=56000" npx snarkjs zkey export verificationkey  "$BUILD_DIR"/"$CIRCUIT_NAME".zkey "$BUILD_DIR"/"$CIRCUIT_NAME"_verification_key.json
 
 end=`date +%s`
 echo "DONE ($((end-start))s)"

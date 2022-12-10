@@ -15,7 +15,7 @@ fi
 echo "****GENERATING WITNESS****"
 start=`date +%s`
 set -x
-node "$BUILD_DIR"/"$CIRCUIT_NAME"_js/generate_witness.js "$BUILD_DIR"/"$CIRCUIT_NAME"_js/$CIRCUIT_NAME.wasm $INPUT_DIR/input_$CIRCUIT_NAME.json $WITNESS
+node "$BUILD_DIR"/"$CIRCUIT_NAME"_js/generate_witness.js "$BUILD_DIR"/"$CIRCUIT_NAME"_js/$CIRCUIT_NAME.wasm $INPUT_DIR/input_$CIRCUIT_NAME.json $WITNESS || exit
 { set +x; } 2>/dev/null
 end=`date +%s`
 echo "DONE ($((end-start))s)"
@@ -23,7 +23,7 @@ echo "DONE ($((end-start))s)"
 echo "****GENERATING PROOF****"
 start=`date +%s`
 set -x
-snarkjs groth16 prove "$BUILD_DIR"/"$CIRCUIT_NAME".zkey $WITNESS $PROOF $PUBLIC
+snarkjs groth16 prove "$BUILD_DIR"/"$CIRCUIT_NAME".zkey $WITNESS $PROOF $PUBLIC || exit
 { set +x; } 2>/dev/null
 end=`date +%s`
 echo "DONE ($((end-start))s)"
@@ -31,7 +31,7 @@ echo "DONE ($((end-start))s)"
 echo "****VERIFYING PROOF****"
 start=`date +%s`
 set -x
-snarkjs groth16 verify "$BUILD_DIR"/"$CIRCUIT_NAME"_verification_key.json $PUBLIC $PROOF
+snarkjs groth16 verify "$BUILD_DIR"/"$CIRCUIT_NAME"_verification_key.json $PUBLIC $PROOF || exit
 { set +x; } 2>/dev/null
 end=`date +%s`
 echo "DONE ($((end-start))s)"

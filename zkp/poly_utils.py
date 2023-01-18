@@ -87,6 +87,22 @@ class PrimeField():
             diff -= 1
         return [x % self.modulus for x in o]
 
+    def div_polys_with_rem(self, a, b):
+        assert len(a) >= len(b)
+        a = [x for x in a]
+        o = []
+        apos = len(a) - 1
+        bpos = len(b) - 1
+        diff = apos - bpos
+        while diff >= 0:
+            quot = self.div(a[apos], b[bpos])
+            o.insert(0, quot)
+            for i in range(bpos, -1, -1):
+                a[diff+i] -= b[i] * quot
+            apos -= 1
+            diff -= 1
+        return [x % self.modulus for x in o], [x % self.modulus for x in a[:apos-1]]
+
     def mod_polys(self, a, b):
         return self.sub_polys(a, self.mul_polys(b, self.div_polys(a, b)))[:len(b)-1]
 

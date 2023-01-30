@@ -1,9 +1,10 @@
+# A simple STARK code to demonstrate range check
 from poly_utils import PrimeField
 import random
 from fft import fft
 from merkle_tree import merkelize, mk_branch, verify_branch
 
-check_z_poly = False
+check_z_poly = True
 
 def shift_poly(poly, modulus, factor):
     factor_power = 1
@@ -30,8 +31,9 @@ v = [random.randint(0, 9) for i in range(n)]
 p_poly = fft(v, modulus, G1, inv=True)
 # evaluations of P(x) over G2
 p_evals = fft(p_poly, modulus, G2)
-# evaluations of C(P(x))
 
+# evaluations of C(P(x)), where
+# C(x) = x(x-1)(x-2)...(x-10)
 c_poly = f.zpoly([x for x in range(10)])
 cp_evals = [f.eval_poly_at(c_poly, x) for x in p_evals]
 cp_poly = fft(cp_evals, modulus, G2, inv=True)
@@ -42,7 +44,7 @@ cp_poly = fft(cp_evals, modulus, G2, inv=True)
 # and check C(P(x)) = Z(x) D(x) at x meaning that
 # - if they are not the same, they only differs at 10 * n points,
 #   and thus, the chance they differs, while the evaluations at x is the same is 10 * n / order of G2.
-print("D(x) generating")
+print("Generating D(x)")
 shift = 7
 shift_inv = f.inv(shift)
 
@@ -54,16 +56,22 @@ shifted_d_evals = [f.div(x, y) for x, y in zip(shifted_cp_evals, shifted_z_poly_
 shifted_d_poly = fft(shifted_d_evals, modulus, G2, inv=True)
 d_poly = shift_poly(shifted_d_poly, modulus, shift_inv)
 d_evals = fft(d_poly, modulus, G2)
-print("D(x) generated")
+print("Generated D(x)")
 
 if check_z_poly:
+    print("Checking D(x)")
     # Find D(x) using polynomial division (slower?)
     d_poly1 = f.div_polys(cp_poly, [modulus - 1] + [0] * (n - 1) + [1])
     d_evals1 = fft(d_poly1, modulus, G2)
     r_poly = f.mod_polys(cp_poly, [modulus - 1] + [0] * (n - 1) + [1])
     assert d_evals == d_evals1
+    print("Checked D(x)")
 
-# Need to commit the Merkle tree of D(x) and P(x).
+## Generate proof
+# Note that we don't reveal actual P(x) data
+# (just commitment and randomly sampling of large group)
+
+# Commit the Merkle tree of D(x) and P(x).
 tree_p = merkelize(p_evals)
 tree_d = merkelize(d_evals)
 

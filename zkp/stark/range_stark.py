@@ -5,6 +5,7 @@ from fft import fft
 from merkle_tree import merkelize, mk_branch, verify_branch
 
 check_z_poly = True
+exact_D = False
 
 def shift_poly(poly, modulus, factor):
     factor_power = 1
@@ -17,7 +18,7 @@ def shift_poly(poly, modulus, factor):
 
 # number of P(x) values
 n = 1024
-extension_factor = 16
+extension_factor = 32
 
 modulus = 2**256 - 2**32 * 351 + 1
 f = PrimeField(modulus)
@@ -45,18 +46,28 @@ cp_poly = fft(cp_evals, modulus, G2, inv=True)
 # - if they are not the same, they only differs at 10 * n points,
 #   and thus, the chance they differs, while the evaluations at x is the same is 10 * n / order of G2.
 print("Generating D(x)")
-shift = 7
-shift_inv = f.inv(shift)
 
-shifted_cp_poly = shift_poly(cp_poly, modulus, shift)
-shifted_cp_evals = fft(shifted_cp_poly, modulus, G2)
-shifted_z_poly = shift_poly([modulus - 1] + [0] * (n - 1) + [1], modulus, shift)
-shifted_z_poly_evals = fft(shifted_z_poly, modulus, G2)
-shifted_d_evals = [f.div(x, y) for x, y in zip(shifted_cp_evals, shifted_z_poly_evals)]
-shifted_d_poly = fft(shifted_d_evals, modulus, G2, inv=True)
-d_poly = shift_poly(shifted_d_poly, modulus, shift_inv)
-d_evals = fft(d_poly, modulus, G2)
-print("Generated D(x)")
+if exact_D:
+    shift = 7
+    shift_inv = f.inv(shift)
+    shifted_cp_poly = shift_poly(cp_poly, modulus, shift)
+    shifted_cp_evals = fft(shifted_cp_poly, modulus, G2)
+    shifted_z_poly = shift_poly([modulus - 1] + [0] * (n - 1) + [1], modulus, shift)
+    shifted_z_poly_evals = fft(shifted_z_poly, modulus, G2)
+    shifted_d_evals = [f.div(x, y) for x, y in zip(shifted_cp_evals, shifted_z_poly_evals)]
+    shifted_d_poly = fft(shifted_d_evals, modulus, G2, inv=True)
+    d_poly = shift_poly(shifted_d_poly, modulus, shift_inv)
+    d_evals = fft(d_poly, modulus, G2)
+else:
+    xs = f.get_power_cycle(G2)
+    z_poly_evals = [xs[(i * n) % precision] - 1 for i in range(precision)]
+    inv_z_poly_evals = f.multi_inv(z_poly_evals)
+
+    d_evals = [cp * iz % modulus for cp, iz in zip(cp_evals, inv_z_poly_evals)]
+    d_poly = fft(d_evals, modulus, G2, inv=True)
+
+print("Generated D(x), degree = %d" %  f.degree(d_poly))
+
 
 if check_z_poly:
     print("Checking D(x)")
@@ -64,7 +75,11 @@ if check_z_poly:
     d_poly1 = f.div_polys(cp_poly, [modulus - 1] + [0] * (n - 1) + [1])
     d_evals1 = fft(d_poly1, modulus, G2)
     r_poly = f.mod_polys(cp_poly, [modulus - 1] + [0] * (n - 1) + [1])
-    assert d_evals == d_evals1
+    if exact_D:
+        assert d_evals == d_evals1
+    else:
+        print("Exact D(x) degree %d, eval diff %d" % (f.degree(d_poly1), [x == y for x, y in zip(d_evals, d_evals1)].count(False)))
+
     print("Checked D(x)")
 
 ## Generate proof

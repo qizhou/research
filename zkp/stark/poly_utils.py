@@ -121,6 +121,20 @@ class PrimeField():
             for j in range(len(root)-1):
                 root[j] -= root[j+1] * x
         return [x % self.modulus for x in root]
+
+    # Get the set of powers of R, until but not including when the powers
+    # loop back to 1
+    def get_power_cycle(self, r):
+        o = [1, r]
+        while o[-1] != 1:
+            o.append((o[-1] * r) % self.modulus)
+        return o[:-1]
+
+    def degree(self, poly):
+        for i in reversed(range(len(poly))):
+            if poly[i] != 0:
+                return i
+        return 0
     
     # Given p+1 y values and x values with no errors, recovers the original
     # p+1 degree polynomial.

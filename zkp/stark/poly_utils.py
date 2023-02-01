@@ -137,7 +137,7 @@ class PrimeField():
         return 0
     
     # Given p+1 y values and x values with no errors, recovers the original
-    # p+1 degree polynomial.
+    # p degree polynomial.
     # Lagrange interpolation works roughly in the following way.
     # 1. Suppose you have a set of points, eg. x = [1, 2, 3], y = [2, 5, 10]
     # 2. For each x, generate a polynomial which equals its corresponding

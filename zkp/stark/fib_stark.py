@@ -1,33 +1,23 @@
-# A simple STARK code to demonstrate fibonacci seq check
+# A simple STARK code to demonstrate Fibonacci sequence check
 from poly_utils import PrimeField
 import random
 from fft import fft
 from merkle_tree import merkelize, mk_branch, verify_branch, mk_multi_branch, verify_multi_branch
 
-check_z_poly = True
-
-def shift_poly(poly, modulus, factor):
-    factor_power = 1
-    inv_factor = pow(factor, modulus - 2, modulus)
-    o = []
-    for p in poly:
-        o.append(p * factor_power % modulus)
-        factor_power = factor_power * inv_factor % modulus
-    return o
-
-# number of P(x) values
+# Number of P(x) values, i.e., length of computation (G1)
 n = 128
 extension_factor = 32
 
 modulus = 2**256 - 2**32 * 351 + 1
 f = PrimeField(modulus)
 
+# Size of the larger group for sampling (G2)
 precision = n * extension_factor
 G2 = f.exp(7, (modulus-1)//precision)
 skips = precision // n
 G1 = f.exp(G2, skips)
 
-# computational trace
+# Computational trace of Fibonacci sequence
 v = [0] * n
 v[0] = 1
 v[1] = 1
@@ -35,17 +25,14 @@ for i in range(2, n):
     v[i] = v[i-1] + v[i-2]
 
 p_poly = fft(v, modulus, G1, inv=True)
-# evaluations of P(x) over G2
+# Evaluations of P(x) over G2
 p_evals = fft(p_poly, modulus, G2)
 
-# evaluations of C(P(x), P(x*g1), P(x*g1*g1), K(x)) = P(x *g1 *g1) - P(x*g1) - P(x)= 0
-# except for x = -g1 and -2 * g1
-
-# c_poly = ...
+# Evaluations of C(P(x), P(x*g1), P(x*g1*g1), K(x)) = P(x *g1 *g1) - P(x*g1) - P(x)= 0
 cp_evals = [(p_evals[(i+2*extension_factor) % precision] - p_evals[(i+extension_factor) % precision] - p_evals[i]) % modulus for i in range(precision)]
 cp_poly = fft(cp_evals, modulus, G2, inv=True)
 
-# Find D(x) over large group defined by G2 such that
+# Find D(x) over the large group defined by G2 such that
 # C(P(x), P(g x), P(g^2 x)) = Z(x) D(x), where Z(x) = (x^n - 1)/(x-G1)/(x-2*G1) is known by both prover and verifier.
 # Since C(P(x)) is at most degree n, randomly sample x at G2
 # and check C(P(x)) = Z(x) D(x) at x meaning that
@@ -73,16 +60,6 @@ i_evals = fft(i_poly, modulus, G2)
 
 b_evals = [((p - i) * iz2) % modulus for p, i, iz2 in zip(p_evals, i_evals, iz2_evals)]
 print("B(x) generated")
-
-# if check_z_poly:
-#     # Find D(x) using polynomial division (slower?)
-#     d_poly1 = f.div_polys(cp_poly, [modulus - 1] + [0] * (n - 1) + [1])
-#     d_evals1 = fft(d_poly1, modulus, G2)
-#     r_poly = f.mod_polys(cp_poly, [modulus - 1] + [0] * (n - 1) + [1])
-#     # only G1 points are not different
-#     print([x == y for x, y in zip(d_evals, d_evals1)].count(False))
-#     print(n)
-#     assert [x == y for x, y in zip(d_evals, d_evals1)].count(False) <= n
 
 # Commit the Merkle tree of D(x) and P(x).
 tree_p = merkelize(p_evals)

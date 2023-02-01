@@ -45,6 +45,7 @@ cp_poly = fft(cp_evals, modulus, G2, inv=True)
 # and check C(P(x)) = Z(x) D(x) at x meaning that
 # - if they are not the same, they only differs at 10 * n points,
 #   and thus, the chance they differs, while the evaluations at x is the same is 10 * n / order of G2.
+# Note that D(x) excludes the the points of Z(x) = 0 (also in low degree check)
 print("Generating D(x)")
 
 if exact_D:

@@ -2,16 +2,16 @@
 
 import random
 import time
-from mimc_stark import mimc_encode, mimc_decode
+from mimc_stark import mimc_encode, mimc_decode, mk_mimc_proof, verify_mimc_proof
 from hashlib import blake2s
 
 hash_fn = lambda x: blake2s(x).digest()
-N_c = 64   # number of computation trace of VDF (MiMC)
-MIMC_constants = [(i**7) ^ 42 for i in range(64)] # MiMC round constants
-N_s = 16    # number of samples per solving window
-N_d = 128  # number of data (BLOBs) of F_q
-modulus = 2**256 - 2**32 * 351 + 1   # q value of F_q
-addr = random.randint(0, modulus - 1)  # address of the storage provider
+N_c = 64        # number of computation trace of VDF (MiMC)
+MIMC_constants = [(i**7) ^ 42 for i in range(min(N_c // 2, 64))] # MiMC round constants
+N_s = 16        # number of samples per solving window
+N_d = 128       # number of data (BLOBs) of F_q
+modulus = 2**256 - 2**32 * 351 + 1      # q value of F_q
+addr = random.randint(0, modulus - 1)   # address of the storage provider
 
 # Raw data written by users
 dataset = [random.randint(0, modulus - 1) for i in range(N_d)]
@@ -61,7 +61,8 @@ def generate_proof(seed, diff, N_s, addr, encoded_dataset):
             break
     encoded_samples = [encoded_dataset[p] for p in ps]
     samples = [(mimc_decode(s, N_c, MIMC_constants) - addr - i) % modulus for i, s in zip(ps, encoded_samples)]
-    proof = (ps, samples, encoded_samples, None)
+    stark_proof = [mk_mimc_proof(encoded_sample, N_c, MIMC_constants) for encoded_sample in encoded_samples]
+    proof = (ps, samples, encoded_samples, stark_proof)
     print("Generated proof with %d candidates" % i)
     return seed, proof
 
@@ -76,8 +77,10 @@ def verify(N_s, seed, addr, diff, hashes, proof):
     assert len(samples) == N_s
     assert len(encoded_samples) == N_s
     assert len(pos) == N_s
-    # TODO: replace by ZKP
-    assert encoded_samples == [mimc_encode((inp + addr + i) % modulus, N_c, MIMC_constants) for i, inp in zip(pos, samples)]
+    # check MIMC using stark
+    for i in range(N_s):
+        assert verify_mimc_proof(encoded_samples[i], N_c, MIMC_constants, (samples[i] + addr + pos[i]) % modulus, stark_proof[i])
+        # assert verify_mimc_proof(encoded_samples[i], N_c, MIMC_constants, mimc_decode(encoded_samples[i], N_c, MIMC_constants), stark_proof[i])
     # check integrity
     assert [hash_fn(sample.to_bytes(32, byteorder="big")) for sample in samples] == [hashes[p] for p in pos]
 

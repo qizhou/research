@@ -21,13 +21,13 @@ def mimc(inp, steps, round_constants):
     return inp
 
 def mimc_encode(inp, steps, round_constants):
-    for i in range(steps-1):
-        inp = (pow(inp, (2 * modulus - 1) // 3, modulus) + round_constants[i % len(round_constants)]) % modulus
+    for i in reversed(range(steps-1)):
+        inp = (pow((inp - round_constants[i % len(round_constants)]) % modulus, (2 * modulus - 1) // 3, modulus)) % modulus
     return inp
 
 def mimc_decode(inp, steps, round_constants):
-    for i in reversed(range(steps-1)):
-        inp = pow((inp - round_constants[i % len(round_constants)]) % modulus, 3, modulus)
+    for i in range(steps-1):
+        inp = (pow(inp, 3, modulus) + round_constants[i % len(round_constants)]) % modulus
     return inp
 
 # Generate a STARK for a MIMC calculation
@@ -58,19 +58,19 @@ def mk_mimc_proof(inp, steps, round_constants):
             (computational_trace[-1]**3 + round_constants[i % len(round_constants)]) % modulus
         )
     output = computational_trace[-1]
-    print('Done generating computational trace')
+    # print('Done generating computational trace')
 
     # Interpolate the computational trace into a polynomial P, with each step
     # along a successive power of G1
     computational_trace_polynomial = fft(computational_trace, modulus, G1, inv=True)
     p_evaluations = fft(computational_trace_polynomial, modulus, G2)
-    print('Converted computational steps into a polynomial and low-degree extended it')
+    # print('Converted computational steps into a polynomial and low-degree extended it')
 
     skips2 = steps // len(round_constants)
     constants_mini_polynomial = fft(round_constants, modulus, f.exp(G1, skips2), inv=True)
     constants_polynomial = [0 if i % skips2 else constants_mini_polynomial[i//skips2] for i in range(steps)]
     constants_mini_extension = fft(constants_mini_polynomial, modulus, f.exp(G2, skips2))
-    print('Converted round constants into a polynomial and low-degree extended it')
+    # print('Converted round constants into a polynomial and low-degree extended it')
 
     # Create the composed polynomial such that
     # C(P(x), P(g1*x), K(x)) = P(g1*x) - P(x)**3 - K(x)
@@ -78,7 +78,7 @@ def mk_mimc_proof(inp, steps, round_constants):
                               f.exp(p_evaluations[i], 3) -
                               constants_mini_extension[i % len(constants_mini_extension)])
                           % modulus for i in range(precision)]
-    print('Computed C(P, K) polynomial')
+    # print('Computed C(P, K) polynomial')
 
     # Compute D(x) = C(P(x), P(g1*x), K(x)) / Z(x)
     # Z(x) = (x^steps - 1) / (x - x_atlast_step)
@@ -86,7 +86,7 @@ def mk_mimc_proof(inp, steps, round_constants):
     z_num_inv = f.multi_inv(z_num_evaluations)
     z_den_evaluations = [xs[i] - last_step_position for i in range(precision)]
     d_evaluations = [cp * zd * zni % modulus for cp, zd, zni in zip(c_of_p_evaluations, z_den_evaluations, z_num_inv)]
-    print('Computed D polynomial')
+    # print('Computed D polynomial')
 
     # Compute interpolant of ((1, input), (x_atlast_step, output))
     interpolant = f.lagrange_interp_2([1, last_step_position], [inp, output])
@@ -96,14 +96,14 @@ def mk_mimc_proof(inp, steps, round_constants):
     inv_z2_evaluations = f.multi_inv([f.eval_poly_at(zeropoly2, x) for x in xs])
 
     b_evaluations = [((p - i) * invq) % modulus for p, i, invq in zip(p_evaluations, i_evaluations, inv_z2_evaluations)]
-    print('Computed B polynomial')
+    # print('Computed B polynomial')
 
     # Compute their Merkle root
     mtree = merkelize([pval.to_bytes(32, 'big') +
                        dval.to_bytes(32, 'big') +
                        bval.to_bytes(32, 'big') for
                        pval, dval, bval in zip(p_evaluations, d_evaluations, b_evaluations)])
-    print('Computed hash root')
+    # print('Computed hash root')
 
     # Based on the hashes of P, D and B, we select a random linear combination
     # of P * x^steps, P, B * x^steps, B and D, and prove the low-degreeness of that,
@@ -126,7 +126,7 @@ def mk_mimc_proof(inp, steps, round_constants):
                       for i in range(precision)]
 
     l_mtree = merkelize(l_evaluations)
-    print('Computed random linear combination')
+    # print('Computed random linear combination')
 
     # Do some spot checks of the Merkle tree at pseudo-random coordinates, excluding
     # multiples of `extension_factor`
@@ -139,7 +139,7 @@ def mk_mimc_proof(inp, steps, round_constants):
     #    branches.append(mk_branch(mtree, pos))
     #    branches.append(mk_branch(mtree, (pos + skips) % precision))
     #    branches.append(mk_branch(l_mtree, pos))
-    print('Computed %d spot checks' % samples)
+    # print('Computed %d spot checks' % samples)
 
     # Return the Merkle roots of P and D, the spot check Merkle proofs,
     # and low-degree proofs of P and D
@@ -148,7 +148,7 @@ def mk_mimc_proof(inp, steps, round_constants):
          mk_multi_branch(mtree, augmented_positions),
          mk_multi_branch(l_mtree, positions),
          prove_low_degree(l_evaluations, G2, steps * 2, modulus, exclude_multiples_of=extension_factor)]
-    print("STARK computed in %.4f sec" % (time.time() - start_time))
+    # print("STARK computed in %.4f sec" % (time.time() - start_time))
     return o
 
 # Verifies a STARK
@@ -214,6 +214,6 @@ def verify_mimc_proof(inp, steps, round_constants, output, proof):
                 k1 * p_of_x - k2 * p_of_x * x_to_the_steps -
                 k3 * b_of_x - k4 * b_of_x * x_to_the_steps) % modulus == 0
 
-    print('Verified %d consistency checks' % spot_check_security_factor)
-    print('Verified STARK in %.4f sec' % (time.time() - start_time))
+    # print('Verified %d consistency checks' % spot_check_security_factor)
+    # print('Verified STARK in %.4f sec' % (time.time() - start_time))
     return True

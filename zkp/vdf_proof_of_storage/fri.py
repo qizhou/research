@@ -11,12 +11,12 @@ from poly_utils import PrimeField
 
 def prove_low_degree(values, root_of_unity, maxdeg_plus_1, modulus, exclude_multiples_of=0):
     f = PrimeField(modulus)
-    print('Proving %d values are degree <= %d' % (len(values), maxdeg_plus_1))
+    # print('Proving %d values are degree <= %d' % (len(values), maxdeg_plus_1))
 
     # If the degree we are checking for is less than or equal to 32,
     # use the polynomial directly as a proof
     if maxdeg_plus_1 <= 16:
-        print('Produced FRI proof')
+        # print('Produced FRI proof')
         return [[x.to_bytes(32, 'big') for x in values]]
 
     # Calculate the set of x coordinates
@@ -58,7 +58,7 @@ def prove_low_degree(values, root_of_unity, maxdeg_plus_1, modulus, exclude_mult
     # This component of the proof, including Merkle branches
     o = [m2[1], mk_multi_branch(m2, ys), mk_multi_branch(m, poly_positions)]
 
-    # Recurse...
+    # Recurse...q
     return [o] + prove_low_degree(column, f.exp(root_of_unity, 4),
                                   maxdeg_plus_1 // 4, modulus, exclude_multiples_of=exclude_multiples_of)
 
@@ -82,7 +82,7 @@ def verify_low_degree_proof(merkle_root, root_of_unity, proof, maxdeg_plus_1, mo
     # Verify the recursive components of the proof
     for prf in proof[:-1]:
         root2, column_branches, poly_branches = prf
-        print('Verifying degree <= %d' % maxdeg_plus_1)
+        # print('Verifying degree <= %d' % maxdeg_plus_1)
 
         # Calculate the pseudo-random x coordinate
         special_x = int.from_bytes(merkle_root, 'big') % modulus
@@ -130,7 +130,7 @@ def verify_low_degree_proof(merkle_root, root_of_unity, proof, maxdeg_plus_1, mo
 
     # Verify the direct components of the proof
     data = [int.from_bytes(x, 'big') for x in proof[-1]]
-    print('Verifying degree <= %d' % maxdeg_plus_1)
+    # print('Verifying degree <= %d' % maxdeg_plus_1)
     assert maxdeg_plus_1 <= 16
 
     # Check the Merkle root matches up
@@ -149,5 +149,5 @@ def verify_low_degree_proof(merkle_root, root_of_unity, proof, maxdeg_plus_1, mo
     for x in pts[maxdeg_plus_1:]:
         assert f.eval_poly_at(poly, powers[x]) == data[x]   
 
-    print('FRI proof verified')
+    # print('FRI proof verified')
     return True

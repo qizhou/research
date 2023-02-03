@@ -1,31 +1,28 @@
-# a simple code to test the performance of mimc
 import random
 import time
 
-n = 10000
+modulus = 2**256 - 2**32 * 351 + 1
+MIMC_constants = [(i**7) ^ 42 for i in range(64)] # MiMC round constants
 
-m = 2 ** 256 - 351 * 2 ** 32 + 1
-rm = (2 * m - 1) // 3
-xs = [random.randint(0, m - 1) for i in range(n)]
+def mimc_encode(inp, steps, round_constants):
+    for i in reversed(range(steps-1)):
+        inp = (pow((inp - round_constants[i % len(round_constants)]) % modulus, (2 * modulus - 1) // 3, modulus)) % modulus
+    return inp
 
-t = time.time()
-x3s = [x ** 3 % m for x in xs]
-print("Forward computation takes: %.4fs" % (time.time() - t))
+def mimc_decode(inp, steps, round_constants):
+    for i in range(steps-1):
+        inp = (pow(inp, 3, modulus) + round_constants[i % len(round_constants)]) % modulus
+    return inp
 
-t = time.time()
-xs1 = [pow(x3, rm, m) % m for x3 in x3s]
-print("Backward computation takes: %.4fs" % (time.time() - t))
-
-
-# use VeeDo's setup
-m = 0x30000003000000010000000000000001
-rm = (2 * m - 1) // 3
-xs = [random.randint(0, m - 1) for i in range(n)]
+n = 20000
 
 t = time.time()
-x3s = [x ** 3 % m for x in xs]
-print("Forward computation takes: %.4fs" % (time.time() - t))
+input = random.randint(0, modulus - 1)
+output = mimc_encode(input, n, MIMC_constants)
+used_time0 = (time.time() - t)
+print("Encode computation takes: %.4fs" % used_time0)
 
 t = time.time()
-xs1 = [pow(x3, rm, m) % m for x3 in x3s]
-print("Backward computation takes: %.4fs" % (time.time() - t))
+assert input == mimc_decode(output, n, MIMC_constants)
+used_time1 = (time.time() - t)
+print("Decode computation takes: %.4fs, diff %d x" % (used_time1, used_time0 / used_time1))

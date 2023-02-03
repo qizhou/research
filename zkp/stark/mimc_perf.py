@@ -1,17 +1,27 @@
 import random
 import time
 
+print("Use max 256 bit modulus")
 modulus = 2**256 - 2**32 * 351 + 1
+power = 3
+
+# BLS12-381
+# print("Use BLS12-381 curve modulus")
+# modulus = 0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab
+# power = 5
+
+assert ((power - 1) * modulus - (power - 2)) % power == 0
+encode_power = ((power - 1) * modulus - (power - 2)) // power
 MIMC_constants = [(i**7) ^ 42 for i in range(64)] # MiMC round constants
 
 def mimc_encode(inp, steps, round_constants):
     for i in reversed(range(steps-1)):
-        inp = (pow((inp - round_constants[i % len(round_constants)]) % modulus, (2 * modulus - 1) // 3, modulus)) % modulus
+        inp = (pow((inp - round_constants[i % len(round_constants)]) % modulus, encode_power, modulus)) % modulus
     return inp
 
 def mimc_decode(inp, steps, round_constants):
     for i in range(steps-1):
-        inp = (pow(inp, 3, modulus) + round_constants[i % len(round_constants)]) % modulus
+        inp = (pow(inp, power, modulus) + round_constants[i % len(round_constants)]) % modulus
     return inp
 
 n = 20000

@@ -62,6 +62,15 @@ def minroot2_encode(inp, steps):
         inp[0] = t
     return inp
 
+def minroot3_encode(inp, steps):
+    a, b, c = inp
+    for i in reversed(range(steps-1)):
+        t = pow((a + b) % modulus, encode_power, modulus)
+        b = (c + i) % modulus
+        c = a
+        a = t
+    return [a, b, c]
+
 def minroot2_decode(inp, steps):
     inp = inp[:]
     for i in range(steps-1):
@@ -69,6 +78,15 @@ def minroot2_decode(inp, steps):
         inp[0] = (inp[1] - i) % modulus
         inp[1] = (t - inp[0]) % modulus
     return inp
+
+def minroot3_decode(inp, steps):
+    a, b, c = inp
+    for i in range(steps-1):
+        t = pow(a, power, modulus)
+        a = c
+        c = (b - i) % modulus
+        b = (t - a) % modulus
+    return [a, b, c]
 
 def verf_test():
     n = 2000
@@ -79,7 +97,15 @@ def verf_test():
 
     assert input == minroot_decode(output, n)
     assert input == minroot2_decode(output, n)
-    print("Verification pass")
+    print("Verification 2-ary pass")
+
+    input = [random.randint(0, modulus - 1) for i in range(3)]
+    output = minroot_encode(input, n)
+    assert output == minroot3_encode(input, n)
+
+    assert input == minroot_decode(output, n)
+    assert input == minroot3_decode(output, n)
+    print("Verification 3-ary pass")
 
 def perf_test():
     n = 20000

@@ -44,7 +44,7 @@ def produce_candidate(N_s, seed, addr, encoded_dataset):
     ps = []
     for i in range(N_s):
         # random sampling position, which is unpredicable until the sampled data is obtained
-        p = int.from_bytes(seed, byteorder="big") % N_s
+        p = int.from_bytes(seed, byteorder="big") % len(encoded_dataset)
         seed = hash_fn(seed + encoded_dataset[p].to_bytes(32, byteorder="big"))
         ps.append(p)
     return seed, ps
@@ -68,7 +68,7 @@ def generate_proof(seed, diff, N_s, addr, encoded_dataset):
 
 
 # Verify the proof on-chain, where
-# - N_s, seed, diff, hashes are available on-chain
+# - N_s, N_d, seed, diff, hashes are available on-chain
 # - addr, proof are provided by the prover
 def verify(N_s, seed, addr, diff, hashes, proof):
     # check proof
@@ -88,7 +88,7 @@ def verify(N_s, seed, addr, diff, hashes, proof):
     seed = hash_fn(seed + addr.to_bytes(32, byteorder="big"))
     for i in range(N_s):
         # random sampling position, which is unpredicable until the sampled data is obtained
-        p = int.from_bytes(seed, byteorder="big") % N_s
+        p = int.from_bytes(seed, byteorder="big") % N_d
         assert p == pos[i]
         seed = hash_fn(seed + encoded_samples[i].to_bytes(32, byteorder="big"))
     assert int.from_bytes(seed, byteorder="big") * diff <= 2 ** 256

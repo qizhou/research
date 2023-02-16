@@ -20,7 +20,33 @@ def minroot_backward(x, y, rounds):
         y = (t - x) % modulus
     return x, y
 
+def minroot_encode(inp, steps):
+    inp = inp[:]
+    for i in range(steps):
+        t = pow((inp[0] + inp[1]) % modulus, encode_power, modulus)
+        inp[1:len(inp)-1] = inp[2:len(inp)]
+        inp[-1] = inp[0]
+        inp[1] = (inp[1] + i) % modulus
+        inp[0] = t
+
+    return inp
+
+def minroot_decode(inp, steps):
+    inp = inp[:]
+    for i in reversed(range(steps)):
+        t = pow(inp[0], power, modulus)
+        inp[0] = inp[-1]
+        inp[1] = (inp[1] - i) % modulus
+        inp[2:len(inp)] = inp[1:len(inp) - 1]
+        inp[1] = (t - inp[0]) % modulus
+    return inp
+
 x, y = minroot_forward(123, 456, 16)
 print(x, y)
 assert minroot_backward(x, y, 16) == (123, 456)
-print("verification passed")
+print("minnroot forward/backward verification passed")
+
+x = minroot_encode([123, 456, 789], 16)
+print(x)
+assert minroot_decode(x, 16) == [123, 456, 789]
+print("miniroot encode/decode verification passed")

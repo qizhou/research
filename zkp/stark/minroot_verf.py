@@ -1,5 +1,7 @@
 # minroot used to verify circom code
 
+import json
+
 print("Use BN128 256 bit modulus")
 modulus = 21888242871839275222246405745257275088548364400416034343698204186575808495617
 power = 5
@@ -50,3 +52,8 @@ x = minroot_encode([123, 456, 789], 16)
 print(x)
 assert minroot_decode(x, 16) == [123, 456, 789]
 print("miniroot encode/decode verification passed")
+
+x = minroot_encode([i+1 for i in range(32)], 1024)
+print(json.dumps([str(y) for y in x]))
+assert minroot_decode(x, 1024) == [i+1 for i in range(32)]
+print("miniroot encode/decode 32-ary verification passed")

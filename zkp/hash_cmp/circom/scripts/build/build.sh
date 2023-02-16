@@ -2,6 +2,8 @@ CIRCUITS_DIR=../../circuits
 BUILD_DIR=../../build
 PHASE1=$BUILD_DIR/pot18_final.ptau
 CIRCUIT_NAME=$1
+ZPROTOCOL=${ZPROTOCOL:-groth16}
+
 
 if [ ! -d "$BUILD_DIR" ]; then
     echo "No build directory found. Creating build directory..."
@@ -26,7 +28,8 @@ fi
 
 echo "****GENERATING ZKEY 0****"
 start=`date +%s`
-npx snarkjs groth16 setup "$BUILD_DIR"/"$CIRCUIT_NAME".r1cs "$PHASE1" "$BUILD_DIR"/"$CIRCUIT_NAME"_0.zkey || exit
+echo PROTOCOL=${ZPROTOCOL}
+npx snarkjs ${ZPROTOCOL} setup "$BUILD_DIR"/"$CIRCUIT_NAME".r1cs "$PHASE1" "$BUILD_DIR"/"$CIRCUIT_NAME"_0.zkey || exit
 end=`date +%s`
 echo "DONE ($((end-start))s)"
 

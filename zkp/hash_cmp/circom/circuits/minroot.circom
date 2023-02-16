@@ -1,25 +1,33 @@
 pragma circom 2.0.6;
 
-template MinRoot(nrounds) {
+// MinRoot backward uses power of 5
+// python code
+// def minroot_backward(x, y, rounds):
+//    for i in reversed(range(rounds)):
+//         t = pow(x, power, modulus)
+//         x = (y - i) % modulus
+//         y = (t - x) % modulus
+//     return x, y
+template MinRoot_Backward(nrounds) {
     signal input x_in, y_in;
     signal output x_out, y_out;
 
     var t;
     signal t2[nrounds];
     signal t4[nrounds];
-    signal t6[nrounds];
-    signal t7[nrounds];
+    signal t5[nrounds];
+    signal x[nrounds];
     signal y[nrounds];
 
     for (var i=0; i<nrounds; i++) {
-        t = (i==0) ? (x_in + y_in) : t7[i - 1] + y[i - 1];
+        t = (i==0) ? x_in : x[i - 1];
         t2[i] <== t*t;
         t4[i] <== t2[i]*t2[i];
-        t6[i] <== t4[i]*t2[i];
-        t7[i] <== t6[i]*t;
-        y[i] <== (i==0) ? x_in : t7[i - 1] + i;
+        t5[i] <== t4[i]*t;
+        x[i] <== ((i==0) ? y_in : y[i - 1]) - nrounds + i + 1;
+        y[i] <== t5[i] - x[i];
     }
-    x_out <== t7[nrounds-1];
+    x_out <== x[nrounds-1];
     y_out <== y[nrounds-1];
 }
 
@@ -63,5 +71,5 @@ template VerifySample(nInputs, nrounds) {
     // TODO: verify commitment
 }
 
-// component main = MinRoot(1024*4);
-component main = VerifySample(32, 4*1024);
+component main = MinRoot_Backward(16);
+// component main = VerifySample(32, 4*1024);

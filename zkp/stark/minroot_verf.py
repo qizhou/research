@@ -2,11 +2,16 @@
 
 import json
 
-print("Use BN128 256 bit modulus")
-modulus = 21888242871839275222246405745257275088548364400416034343698204186575808495617
+# print("Use BN128 256 bit modulus")
+# modulus = 21888242871839275222246405745257275088548364400416034343698204186575808495617
+# power = 5
+# encode_power = (power - 1) * modulus - (power - 2) // power
+
+print("Use BLS12-381 modulus")
+modulus = 52435875175126190479447740508185965837690552500527637822603658699938581184513
 power = 5
-assert ((power - 1) * modulus - (power - 2)) % power == 0
-encode_power = ((power - 1) * modulus - (power - 2)) // power
+encode_power = (2 * modulus - 1) // power
+
 
 def minroot_forward(x, y, rounds):
     for i in range(rounds):

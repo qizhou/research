@@ -1,8 +1,9 @@
 CIRCUITS_DIR=../../circuits
 BUILD_DIR=../../build
-PHASE1=$BUILD_DIR/pot18_final.ptau
 CIRCUIT_NAME=$1
 ZPROTOCOL=${ZPROTOCOL:-groth16}
+CURVE=${CURVE:-bn128}
+PHASE1=$BUILD_DIR/pot18_${CURVE}_final.ptau
 
 
 if [ ! -d "$BUILD_DIR" ]; then
@@ -13,7 +14,7 @@ fi
 echo "****COMPILING CIRCUIT****"
 start=`date +%s`
 set -x
-circom $CIRCUITS_DIR/$CIRCUIT_NAME.circom --r1cs --wasm --sym --c --wat --output "$BUILD_DIR" || exit
+circom $CIRCUITS_DIR/$CIRCUIT_NAME.circom -p ${CURVE} --r1cs --wasm --sym --c --wat --output "$BUILD_DIR" || exit
 { set +x; } 2>/dev/null
 end=`date +%s`
 echo "DONE ($((end-start))s)"

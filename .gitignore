@@ -1,1 +1,3 @@
 *.pyc
+zkp/hash_cmp/circom/build/**
+zkp/hash_cmp/circom/node_modules/**

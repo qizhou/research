@@ -38,6 +38,34 @@ def minroot_encode(inp, steps):
 
     return inp
 
+def minroot_encode_layered(inp, nlayers):
+    x = inp[:]
+    y = [0] * len(inp)
+    for i in range(nlayers):
+        y[1] = pow((x[0] + x[1]) % modulus, encode_power, modulus)
+        for j in range(2, len(inp)):
+            y[j] = pow((y[j-1] + x[j] + j - 2 + (i * len(inp))) % modulus, encode_power, modulus)
+        y[0] = pow((y[-1] + x[0] + (i * len(inp)) + len(inp) - 2) % modulus, encode_power, modulus)
+        y[1] += ((i + 1) * len(inp)) - 1
+        x = y
+    return x
+
+
+# Exact equation in paper
+def minroot_encode_layered1(inp, nlayers):
+    x = inp[:]
+    k = len(inp)
+    y = [0] * len(inp)
+    for i in range(1, nlayers + 1):
+        y[1] = pow((x[0] + x[1]) % modulus, encode_power, modulus) + i * k - 1
+        y[2] = pow((y[1] + x[2] + 1 - k) % modulus, encode_power, modulus)
+        for j in range(3, len(inp)):
+            y[j] = pow((y[j-1] + x[j] + j-2+(i-1)*k) % modulus, encode_power, modulus)
+        y[0] = pow((y[-1] + x[0] + i*k-2) % modulus, encode_power, modulus)
+        x = y
+    return x
+
+
 def minroot_decode(inp, steps):
     inp = inp[:]
     for i in reversed(range(steps)):
@@ -51,14 +79,21 @@ def minroot_decode(inp, steps):
 x, y = minroot_forward(123, 456, 16)
 print(x, y)
 assert minroot_backward(x, y, 16) == (123, 456)
-print("minnroot forward/backward verification passed")
+print("minroot forward/backward verification passed")
 
 x = minroot_encode([123, 456, 789], 16)
 print(x)
 assert minroot_decode(x, 16) == [123, 456, 789]
-print("miniroot encode/decode verification passed")
+print("minroot encode/decode verification passed")
 
 x = minroot_encode([i+1 for i in range(32)], 1024)
 print(json.dumps([str(y) for y in x]))
 assert minroot_decode(x, 1024) == [i+1 for i in range(32)]
-print("miniroot encode/decode 32-ary verification passed")
+print("minroot encode/decode 32-ary verification passed")
+
+x0 = minroot_encode([123, 456, 789, 555], 16)
+x1 = minroot_encode_layered([123, 456, 789, 555], 4)
+x2 = minroot_encode_layered1([123, 456, 789, 555], 4)
+assert x0 == x1
+assert x0 == x2
+print("minroot layered verification passed")

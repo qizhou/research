@@ -1,6 +1,7 @@
 # A simple polynomial commitment interface
 
 import random
+import hashlib
 
 from fft import fft
 from ec import (G1Generator, G2Generator, default_ec)
@@ -39,14 +40,23 @@ class PolyCommitment:
         sv = self.getSetupVector1(len(coeffs))
         return sum(s * c for s, c in zip(sv, coeffs))
 
-    def getSingleProof(self, evals, g, idx):
+    def getSingleProofByEvalIdx(self, evals, g, idx):
         # g - primitive root of unity
         # order - order of g
         # n - g^n root of unity
         # qx = (x^n - 1) / (x-x0)
         coeffs = fft(evals, self.pf.modulus, g, inv=True)
-        coeffs[0] = coeffs[0] - evals[idx]
+        y0 = evals[idx]
         x0 = self.pf.exp(g, idx)
+        return self.getSingleProofAt(coeffs, x0, y0)
+
+    def getSingleProofAt(self, coeffs, x0, y0):
+        # g - primitive root of unity
+        # order - order of g
+        # n - g^n root of unity
+        # qx = (x^n - 1) / (x-x0)
+        coeffs = coeffs[:]
+        coeffs[0] = coeffs[0] - y0
         qx = self.pf.div_polys(coeffs, [self.modulus-x0, 1])
         sv = self.getSetupVector1(len(qx))
         return sum(s * c for s, c in zip(sv, qx))
@@ -65,13 +75,45 @@ def test_poly_commitment():
     G = pc.pf.exp(7, (pc.pf.modulus-1) // 4)
     evals = [235, 2346, 132213, 61232]
     commit = pc.getCommitment(evals, G)
-    proof = pc.getSingleProof(evals, G, 1) # w^1
+    proof = pc.getSingleProofByEvalIdx(evals, G, 1) # w^1
     assert pc.verifySingleProof(commit, proof, G, 2346)
-    
     print("poly_commitment test passed")
+
+
+def test_full_poly():
+    pc = PolyCommitment()
+    G = pc.pf.exp(7, (pc.pf.modulus-1) // 4)
+    evals = [235, 2346, 132213, 61232]
+    commit = pc.getCommitment(evals, G)
+
+    # given evals, check evals matches the commitment with single open
+    # note that we could also do the check by
+    # - find the evals coeffs
+    # - multiple setup s^x G's
+    # which may be expensive in contract.
+
+    # find a random evaluation point using Fiat-Shamir heuristic
+    # where inputs are commit + evals
+    data = bytes(commit)
+    for eval in evals:
+        # BLS modulus is in 256-bit
+        data += eval.to_bytes(32, byteorder="big")
+    # simple hash to point
+    r = int.from_bytes(hashlib.sha256(b"1234").digest(), byteorder="big") % default_ec.n
+
+    # use barycentric formula to calculate the point with evaluations
+    pf = pc.pf
+    yr = pf.eval_barycentric(r, [pf.exp(G, i) for i in range(4)], evals)
+
+    # get the proof at random r (this part is off-chain)
+    proof = pc.getSingleProofAt(fft(evals, pf.modulus, G, inv=True), r, yr)
+    # single open to verify
+    assert pc.verifySingleProof(commit, proof, r, yr)
+    print("full_poly test passed")
 
 if __name__ == "__main__":
     test_poly_commitment()
+    test_full_poly()
         
         
         

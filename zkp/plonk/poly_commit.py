@@ -81,6 +81,7 @@ def test_poly_commitment():
 
 
 def test_full_poly():
+    # Verify full data blobs in EIP-4844 setup
     pc = PolyCommitment()
     G = pc.pf.exp(7, (pc.pf.modulus-1) // 4)
     evals = [235, 2346, 132213, 61232]
@@ -91,25 +92,45 @@ def test_full_poly():
     # - find the evals coeffs
     # - multiple setup s^x G's
     # which may be expensive in contract.
+    def get_proof(pc, commit, evals):
+        # find a random evaluation point using Fiat-Shamir heuristic
+        # where inputs are commit + evals
+        data = bytes(commit)
+        for eval in evals:
+            # BLS modulus is in 256-bit
+            data += eval.to_bytes(32, byteorder="big")
+        # simple hash to point
+        r = int.from_bytes(hashlib.sha256(b"1234").digest(), byteorder="big") % default_ec.n
 
-    # find a random evaluation point using Fiat-Shamir heuristic
-    # where inputs are commit + evals
-    data = bytes(commit)
-    for eval in evals:
-        # BLS modulus is in 256-bit
-        data += eval.to_bytes(32, byteorder="big")
-    # simple hash to point
-    r = int.from_bytes(hashlib.sha256(b"1234").digest(), byteorder="big") % default_ec.n
+        # use barycentric formula to calculate the point with evaluations
+        pf = pc.pf
+        yr = pf.eval_barycentric(r, [pf.exp(G, i) for i in range(4)], evals)
 
-    # use barycentric formula to calculate the point with evaluations
-    pf = pc.pf
-    yr = pf.eval_barycentric(r, [pf.exp(G, i) for i in range(4)], evals)
+        # get the proof at random r (this part is off-chain)
+        return pc.getSingleProofAt(fft(evals, pf.modulus, G, inv=True), r, yr)
 
-    # get the proof at random r (this part is off-chain)
-    proof = pc.getSingleProofAt(fft(evals, pf.modulus, G, inv=True), r, yr)
+    def verify_proof(pc, commit, evals, proof):
+        # find a random evaluation point using Fiat-Shamir heuristic
+        # where inputs are commit + evals
+        data = bytes(commit)
+        for eval in evals:
+            # BLS modulus is in 256-bit
+            data += eval.to_bytes(32, byteorder="big")
+        # simple hash to point
+        r = int.from_bytes(hashlib.sha256(b"1234").digest(), byteorder="big") % default_ec.n
+
+        # use barycentric formula to calculate the point with evaluations
+        pf = pc.pf
+        yr = pf.eval_barycentric(r, [pf.exp(G, i) for i in range(4)], evals)
+
+        return pc.verifySingleProof(commit, proof, r, yr)
+
+    proof = get_proof(pc, commit, evals)
+
     # single open to verify
-    assert pc.verifySingleProof(commit, proof, r, yr)
+    assert verify_proof(pc, commit, evals, proof)
     print("full_poly test passed")
+
 
 if __name__ == "__main__":
     test_poly_commitment()

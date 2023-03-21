@@ -100,7 +100,7 @@ def test_full_poly():
             # BLS modulus is in 256-bit
             data += eval.to_bytes(32, byteorder="big")
         # simple hash to point
-        r = int.from_bytes(hashlib.sha256(b"1234").digest(), byteorder="big") % default_ec.n
+        r = int.from_bytes(hashlib.sha256(data).digest(), byteorder="big") % default_ec.n
 
         # use barycentric formula to calculate the point with evaluations
         pf = pc.pf
@@ -117,7 +117,7 @@ def test_full_poly():
             # BLS modulus is in 256-bit
             data += eval.to_bytes(32, byteorder="big")
         # simple hash to point
-        r = int.from_bytes(hashlib.sha256(b"1234").digest(), byteorder="big") % default_ec.n
+        r = int.from_bytes(hashlib.sha256(data).digest(), byteorder="big") % default_ec.n
 
         # use barycentric formula to calculate the point with evaluations
         pf = pc.pf

@@ -49,23 +49,21 @@ def sum_comp(nodes):
     return comp
 
 
-def cbc_example(layers=1, cache=None):
-    n = 8
-
+def cbc_example(layers=1, cache=None, n=8, mid_comp=0):
     trace = Trace()
     # first layer, each with computational cost 1
     for _ in range(n):
         trace.addNode([], 1)
 
     # first output
-    trace.addNode([trace.getNode(0)], 0, layers==1)
+    trace.addNode([trace.getNode(0)], mid_comp, layers==1)
     # first layer
     for i in range(1, n):
-        trace.addNode([trace.getNode(i), trace.getLastNode()], 0, layers==1)
+        trace.addNode([trace.getNode(i), trace.getLastNode()], mid_comp, layers==1)
 
     for l in range(1, layers):
         for i in range(0, n):
-            trace.addNode([trace.getPreviousNode(n), trace.getLastNode()], 0, layers-1==l)
+            trace.addNode([trace.getPreviousNode(n), trace.getLastNode()], mid_comp, layers-1==l)
 
     output = trace.calculateOutputComp(sum_comp, cache)
     print(output)
@@ -83,3 +81,10 @@ cbc_example(2, cache=[11, 19])
 cbc_example(2, cache=[11, 12])
 cbc_example(2, cache=[19, 20])
 cbc_example(2, cache=[11, 20])
+
+cbc_example(16, cache=[], n=16, mid_comp=1)
+cbc_example(16, cache=[272-8], n=16, mid_comp=1)
+cbc_example(16, cache=[272-8, 272-12], n=16, mid_comp=1)
+cbc_example(16, cache=[272-8, 272-12, 272-4], n=16, mid_comp=1)
+cbc_example(16, cache=[272-8, 272-8-16], n=16, mid_comp=1)
+cbc_example(16, cache=[272-8-32, 272-8-16], n=16, mid_comp=1)

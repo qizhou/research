@@ -7,13 +7,13 @@ from poly_utils import PrimeField
 
 # a simple code to demonstrate f(x) = p(x) q(x) using fft
 # degrees of p(x) and q(x)
-d_p = 254
-d_q = 190
+d_p = 254 * 8
+d_q = 190 * 8
 
 modulus = 52435875175126190479447740508185965837690552500527637822603658699938581184513
 pf = PrimeField(modulus)
 # root of unity
-N = 512
+N = 512 * 8
 assert d_p + d_q + 1 <= N
 ru = pf.exp(7, (modulus-1) // N)
 

@@ -39,6 +39,13 @@ class PolyCommitment:
         coeffs = fft(evals, self.pf.modulus, g, inv=True)
         sv = self.getSetupVector1(len(coeffs))
         return sum(s * c for s, c in zip(sv, coeffs))
+    
+    # get the commitment of a polynomial in evaluation form
+    # return a curve point
+    def getCommitmentByCoeffs(self, coeffs, g):
+        # g - roots of unity
+        sv = self.getSetupVector1(len(coeffs))
+        return sum(s * c for s, c in zip(sv, coeffs))
 
     def getSingleProofByEvalIdx(self, evals, g, idx):
         # g - primitive root of unity
@@ -51,10 +58,6 @@ class PolyCommitment:
         return self.getSingleProofAt(coeffs, x0, y0)
 
     def getSingleProofAt(self, coeffs, x0, y0):
-        # g - primitive root of unity
-        # order - order of g
-        # n - g^n root of unity
-        # qx = (x^n - 1) / (x-x0)
         coeffs = coeffs[:]
         coeffs[0] = coeffs[0] - y0
         qx = self.pf.div_polys(coeffs, [self.modulus-x0, 1])
@@ -132,9 +135,44 @@ def test_full_poly():
     print("full_poly test passed")
 
 
+def test_prod1():
+    pc = PolyCommitment()
+    order = 16
+    G = pc.pf.exp(7, (pc.pf.modulus-1) // order)
+
+    # obtain two polynomials
+    p1 = [random.randint(0, pc.modulus -1) for i in range(4)]
+    p2 = [random.randint(0, pc.modulus -1) for i in range(4)]
+
+    # obtain p1(x) * p2(x)
+    q = pc.pf.mul_polys(p1, p2)
+
+    # commit and random evaluation point
+    c_p1 = pc.getCommitmentByCoeffs(p1, G)
+    c_p2 = pc.getCommitmentByCoeffs(p2, G)
+    c_q = pc.getCommitmentByCoeffs(q, G)
+    r = random.randint(0, pc.modulus - 1)
+    
+    # to verify p1(x) * p2(x) = q(x), find r and evaluate so that they are the same
+    y_p1_r = pc.pf.eval_poly_at(p1, r)
+    y_p2_r = pc.pf.eval_poly_at(p2, r)
+    y_q_r = pc.pf.eval_poly_at(q, r)
+    proof_p1_r = pc.getSingleProofAt(p1, r, y_p1_r)
+    proof_p2_r = pc.getSingleProofAt(p2, r, y_p2_r)
+    proof_q_r = pc.getSingleProofAt(q, r, y_q_r)
+
+    # verify
+    assert y_p1_r * y_p2_r % pc.modulus == y_q_r
+    assert pc.verifySingleProof(c_p1, proof_p1_r, r, y_p1_r)
+    assert pc.verifySingleProof(c_p2, proof_p2_r, r, y_p2_r)
+    assert pc.verifySingleProof(c_q, proof_q_r, r, y_q_r)
+    print("test_prod1 passed") 
+
+
 if __name__ == "__main__":
-    test_poly_commitment()
-    test_full_poly()
+    # test_poly_commitment()
+    # test_full_poly()
+    test_prod1()
         
         
         

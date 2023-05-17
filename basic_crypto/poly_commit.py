@@ -197,12 +197,15 @@ def test_prod1_linearization():
     
     kx = pc.pf.add_polys(p1x, pc.pf.mul_polys([mu], rx))
     proof_kx_zeta = pc.getSingleProofAt(kx, zeta, 0)
+    proof_p1_zeta = pc.getSingleProofAt(p1x, zeta, 0)
+
     
     # verify
     c_r = c_p2 * y_p1_r + c_q.negate()
     c_k = c_p1 + mu * c_r
+    assert pc.verifySingleProof(c_p1, proof_p1_zeta, zeta, y_p1_r)
     assert pc.verifySingleProof(c_k, proof_kx_zeta, zeta, y_p1_r)
-    print("test_prod1_linearization passed") 
+    print("test_prod1_linearization passed")
 
 
 if __name__ == "__main__":

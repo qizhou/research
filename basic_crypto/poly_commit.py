@@ -169,10 +169,47 @@ def test_prod1():
     print("test_prod1 passed") 
 
 
+def test_prod1_linearization():
+    pc = PolyCommitment()
+    order = 16
+    G = pc.pf.exp(7, (pc.pf.modulus-1) // order)
+
+    # obtain two polynomials
+    p1x = [random.randint(0, pc.modulus -1) for i in range(4)]
+    p2x = [random.randint(0, pc.modulus -1) for i in range(4)]
+
+    # obtain p1(x) * p2(x)
+    qx = pc.pf.mul_polys(p1x, p2x)
+
+    # commit and random evaluation point
+    zeta = random.randint(0, pc.modulus - 1)
+    y_p1_r = pc.pf.eval_poly_at(p1x, zeta)
+    # construct r(x) = p1(r) * p2(x) - q(x)
+    rx = pc.pf.sub_polys(pc.pf.mul_polys([y_p1_r], p2x), qx)
+    # test r(zeta) = 0
+
+    # batch KZG
+    mu = random.randint(0, pc.modulus - 1)
+    # kx = p1(x) + mu r(x)
+    c_p1 = pc.getCommitmentByCoeffs(p1x, G)
+    c_p2 = pc.getCommitmentByCoeffs(p2x, G)
+    c_q = pc.getCommitmentByCoeffs(qx, G)
+    
+    kx = pc.pf.add_polys(p1x, pc.pf.mul_polys([mu], rx))
+    proof_kx_zeta = pc.getSingleProofAt(kx, zeta, 0)
+    
+    # verify
+    c_r = c_p2 * y_p1_r + c_q.negate()
+    c_k = c_p1 + mu * c_r
+    assert pc.verifySingleProof(c_k, proof_kx_zeta, zeta, y_p1_r)
+    print("test_prod1_linearization passed") 
+
+
 if __name__ == "__main__":
     # test_poly_commitment()
     # test_full_poly()
-    test_prod1()
+    # test_prod1()
+    test_prod1_linearization()
         
         
         

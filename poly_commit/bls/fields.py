@@ -24,10 +24,8 @@ class Fq:
             return NotImplemented
         return Fq(self.Q, self.value + other.value)
 
-    def __radd__(self, other: Fq) -> Fq:
-        if not isinstance(other, Fq):
-            return NotImplemented
-        return self.__add__(other)
+    def __radd__(self, other: int) -> Fq:
+        return self.__add__(Fq(self.Q, other))
 
     def __sub__(self, other: Fq) -> Fq:
         if not isinstance(other, Fq):

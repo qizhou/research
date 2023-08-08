@@ -65,10 +65,21 @@ class PolyCommitment:
         return sum(s * c for s, c in zip(sv, qx))
 
     def verifySingleProof(self, commit, proof, x0, y0):
+        # verify using
+        # e(c - [y0], [1]) = e(proof, [tau - x0])
         sz2 = self.G2 * self.secret + (self.G2 * x0).negate()
         pair0 = ate_pairing(proof, sz2)
 
         cy = commit + (self.G1 * y0).negate()
+        pair1 = ate_pairing(cy, self.G2)
+        return pair0 == pair1
+    
+    def verifySingleProof2(self, commit, proof, x0, y0):
+        # verify using
+        # e(c - [y0] + proof * x0, [1]), e(proof, [tau])
+        pair0 = ate_pairing(proof, self.G2 * self.secret)
+
+        cy = commit + (self.G1 * y0).negate() + proof * x0
         pair1 = ate_pairing(cy, self.G2)
         return pair0 == pair1
 
@@ -80,6 +91,7 @@ def test_poly_commitment():
     commit = pc.getCommitment(evals, G)
     proof = pc.getSingleProofByEvalIdx(evals, G, 1) # w^1
     assert pc.verifySingleProof(commit, proof, G, 2346)
+    assert pc.verifySingleProof2(commit, proof, G, 2346)
     print("poly_commitment test passed")
 
 
@@ -209,7 +221,7 @@ def test_prod1_linearization():
 
 
 if __name__ == "__main__":
-    # test_poly_commitment()
+    test_poly_commitment()
     # test_full_poly()
     # test_prod1()
     test_prod1_linearization()

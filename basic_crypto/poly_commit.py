@@ -84,6 +84,12 @@ class PolyCommitment:
         return pair0 == pair1
 
 
+def ec_lincomb(points, vs):
+    # simple, inefficient linear combination
+    ps = [p * v for p, v in zip(points, vs)]
+    return sum(ps[1:], start=ps[0])
+
+
 def test_poly_commitment():
     pc = PolyCommitment()
     G = pc.pf.exp(7, (pc.pf.modulus-1) // 4)
@@ -220,8 +226,49 @@ def test_prod1_linearization():
     print("test_prod1_linearization passed")
 
 
+def test_batch():
+    # Test batch KZG with mul polys
+
+    pc = PolyCommitment()
+    order = 16
+    G = pc.pf.exp(7, (pc.pf.modulus-1) // order)
+
+    npoly = 3
+    ps = []
+    xs = []
+    ys = []
+    qs = []
+    cs = []
+    r = random.randint(0, pc.modulus - 1) # random linear combination
+    # e(sum(c_i * r^i) + sum(proof_i * x_i * r^i)  -  sum(r^i y_i), [1]) = e(sum(proof_i * r^i), [])
+    for i in range(npoly):
+        p = [random.randint(0, pc.modulus -1) for i in range(4)]
+        c = pc.getCommitmentByCoeffs(p, G)
+        ps.append(p)
+        x = random.randint(0, pc.modulus - 1)
+        y = pc.pf.eval_poly_at(p, x)
+        q = pc.getSingleProofAt(p, x, y)
+        xs.append(x)
+        ys.append(y)
+        qs.append(q)
+        cs.append(c)
+
+    rs = [pow(r, i, pc.pf.modulus) for i in range(npoly)]
+    xrs = [xs[i] * pow(r, i, pc.pf.modulus) % pc.modulus for i in range(npoly)]
+    cr = ec_lincomb(cs, rs)
+    pxr = ec_lincomb(qs, xrs)
+    yr = ec_lincomb(ys, rs)
+    pr = ec_lincomb(qs, rs)
+
+    left = ate_pairing(cr + pxr + yr * pc.G1.negate(), pc.G2)
+    right = ate_pairing(pr, pc.G2 * pc.secret)
+    assert left == right
+    print("test_batch passd")
+
+
 if __name__ == "__main__":
     test_poly_commitment()
+    test_batch()
     # test_full_poly()
     # test_prod1()
     test_prod1_linearization()

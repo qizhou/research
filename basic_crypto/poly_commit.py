@@ -462,6 +462,62 @@ def test_prescribed_permutation():
     print("test_perscribed_permutation passed")
 
 
+def test_simple_plonk():
+    # The trace of the plonk is
+    # w^-1 w^-2 w^-3   | 5, 6, 1
+    # ------------------------
+    # w^0  w^1  w^2    | 5, 6, 11
+    # w^3  w^4  w^5    | 6, 1, 7
+    # w^6  w^7  w^8    | 11, 7, 77
+
+    # selector
+    S = [1, 1, 0]
+
+    # assignments
+    # T(w^-1) = T(w^0)
+    # T(w^-2) = T(w^1)
+    # T(w^-3) = T(w^4)
+    # T(w^2) = T(w^6)
+    order = 16
+    pc = PolyCommitment()
+    g = pc.pf.exp(7, (pc.pf.modulus-1) // order)
+    assign_list = [
+        [order - 1, 0],
+        [order - 2, 1, 3],
+        [order - 3, 4],
+        [2, 6],
+        [5, 7],
+        [order - 4, 8]
+    ]
+    seq0 = [i for i in range(order)]
+    seq1 = seq0[:]
+    # TODO: check unassigned and make them to zero (so that T(x) is unique)
+    for a in assign_list:
+        for x in a:
+            # make sure it is not assigned before
+            assert seq1[x] == x
+        for i in range(len(a)):
+            seq1[a[i]] = a[i-1]
+    # circuit setup (seq0 can be optimized)
+    setup = (pc.getCommitment(seq0, g), pc.getCommitment(seq1, g))
+
+    # input and trace
+    input = [5, 6, 1, 77]
+    T = [5, 6, 11, 6, 1, 7, 11, 7, 77, 0, 0, 0, 77, 1, 6, 5]
+
+    # sanity check
+    assert len(T) == order
+    # check input (zero test on input subgroup)
+    assert T[-len(input):] == [x for x in reversed(input)]
+    # check assignment
+    for a in assign_list:
+        x = T[a[0]]
+        for i in a:
+            assert T[i] == x
+    # check selector (zero test on selector subgroup)
+    for i in range(len(S)):
+        assert S[i] * (T[i*3] + T[i*3+1]) + (1 - S[i]) * T[i*3] * T[i*3+1] == T[i*3+2]
+
 if __name__ == "__main__":
     # test_poly_commitment()
     # test_batch()
@@ -469,6 +525,7 @@ if __name__ == "__main__":
     test_prod_one()
     test_permutation()
     test_prescribed_permutation()
+    test_simple_plonk()
     # test_full_poly()
     # test_prod1()
     test_prod1_linearization()

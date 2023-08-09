@@ -395,12 +395,80 @@ def test_permutation():
     print("test_permutation passed")
 
 
+def test_prescribed_permutation():
+    # Test if the permutation of two polys in a subgroup
+
+    pc = PolyCommitment()
+
+    order = 4
+    omega = pc.pf.exp(7, (pc.pf.modulus-1) // order)
+    p0 = [pc.rand() for i in range(order)]
+    p1 = p0[:]
+    random.shuffle(p1)
+    coeffs_p0 = fft(p0, pc.modulus, omega, inv=True)
+    coeffs_p1 = fft(p1, pc.modulus, omega, inv=True)
+
+    c_p0 = pc.getCommitmentByCoeffs(coeffs_p0)
+    c_p1 = pc.getCommitmentByCoeffs(coeffs_p1)
+
+    p0 = [pc.rand() for i in range(order)]
+    seq0 = [i for i in range(order)] # can be simply seq0(x) = x
+    seq1 = seq0[:]
+    random.shuffle(seq1)
+    p1 = [p0[i] for i in seq1]
+    coeffs_p0 = fft(p0, pc.modulus, omega, inv=True)
+    coeffs_p1 = fft(p1, pc.modulus, omega, inv=True)
+    coeffs_seq0 = fft(seq0, pc.modulus, omega, inv=True)    
+    coeffs_seq1 = fft(seq1, pc.modulus, omega, inv=True)
+    
+    theta = pc.rand()
+    gamma = pc.rand()
+    f0 = [v * gamma - s - theta for v, s in zip(p0, seq0)]
+    f1 = [v * gamma - s - theta for v, s in zip(p1, seq1)]
+    coeffs_f0 = fft(f0, pc.modulus, omega, inv=True)
+    coeffs_f1 = fft(f1, pc.modulus, omega, inv=True)
+    # f0 / f1
+    evals = [pc.pf.div(v0, v1) for v0, v1 in zip(f0, f1)]
+    
+    # construct t such that t(w^0) = 1, t(wx) f1(x) = f0(x) t(x)
+    # where f(x) = p(x) * gamma - seq(x) - theta
+    # (note that it is a bit different with lecture notes)
+    t = [1]
+    for x in evals[:-1]:
+        t.append(t[-1] * x % pc.modulus)
+
+    coeffs_t = fft(t, pc.modulus, omega, inv=True)
+    c_t = pc.getCommitmentByCoeffs(coeffs_t)
+
+    coeffs_t1 = pc.pf.sub_polys(
+        pc.pf.mul_polys(pc.pf.shift_poly(coeffs_t, omega), coeffs_f1),
+        pc.pf.mul_polys(coeffs_t, coeffs_f0)
+    )
+
+    # vanishing poly
+    z = [pc.modulus - 1] + [0] * (order - 1) + [1]
+    q, rem = pc.pf.div_polys_with_rem(coeffs_t1, z)
+    assert rem == [0] * order
+
+    r = pc.rand()
+    # TODO: query t(wr), p0(r), p1(r), t(r), t(1), q(r), seq0(r), seq1(r) (using batch)
+    t_wr = pc.pf.eval_poly_at(coeffs_t, omega * r)
+    f0_r = pc.pf.sub(pc.pf.eval_poly_at(coeffs_p0, r) * gamma - pc.pf.eval_poly_at(coeffs_seq0, r), theta)
+    f1_r = pc.pf.sub(pc.pf.eval_poly_at(coeffs_p1, r) * gamma - pc.pf.eval_poly_at(coeffs_seq1, r), theta)
+    t_r = pc.pf.eval_poly_at(coeffs_t,  r)
+    q_r = pc.pf.eval_poly_at(q, r)
+    # assert t(1)= 1
+    assert q_r * (pow(r, order, pc.modulus) - 1) % pc.modulus == (t_wr * f1_r - f0_r * t_r) % pc.modulus
+    print("test_perscribed_permutation passed")
+
+
 if __name__ == "__main__":
     # test_poly_commitment()
     # test_batch()
     # test_zero()
     test_prod_one()
     test_permutation()
+    test_prescribed_permutation()
     # test_full_poly()
     # test_prod1()
     test_prod1_linearization()

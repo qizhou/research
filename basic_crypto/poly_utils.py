@@ -96,6 +96,14 @@ class PrimeField():
     def mul_by_const(self, a, c):
         return [(x*c) % self.modulus for x in a]
     
+    def shift_poly(self, p, x):
+        xi = 1
+        np = []
+        for pv in p:
+            np.append(xi * pv % self.modulus)
+            xi = xi * x % self.modulus
+        return np
+    
     def mul_polys(self, a, b):
         o = [0] * (len(a) + len(b) - 1)
         for i, aval in enumerate(a):
@@ -133,7 +141,7 @@ class PrimeField():
                 a[diff+i] -= b[i] * quot
             apos -= 1
             diff -= 1
-        return [x % self.modulus for x in o], [x % self.modulus for x in a[:apos-1]]
+        return [x % self.modulus for x in o], [x % self.modulus for x in a[:bpos]]
 
     def mod_polys(self, a, b):
         return self.sub_polys(a, self.mul_polys(b, self.div_polys(a, b)))[:len(b)-1]

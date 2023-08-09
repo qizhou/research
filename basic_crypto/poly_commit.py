@@ -42,7 +42,7 @@ class PolyCommitment:
     
     # get the commitment of a polynomial in evaluation form
     # return a curve point
-    def getCommitmentByCoeffs(self, coeffs, g):
+    def getCommitmentByCoeffs(self, coeffs):
         # g - roots of unity
         sv = self.getSetupVector1(len(coeffs))
         return sum(s * c for s, c in zip(sv, coeffs))
@@ -82,6 +82,9 @@ class PolyCommitment:
         cy = commit + (self.G1 * y0).negate() + proof * x0
         pair1 = ate_pairing(cy, self.G2)
         return pair0 == pair1
+    
+    def rand(self):
+        return random.randint(0, self.modulus - 1)
 
 
 def ec_lincomb(points, vs):
@@ -166,9 +169,9 @@ def test_prod1():
     q = pc.pf.mul_polys(p1, p2)
 
     # commit and random evaluation point
-    c_p1 = pc.getCommitmentByCoeffs(p1, G)
-    c_p2 = pc.getCommitmentByCoeffs(p2, G)
-    c_q = pc.getCommitmentByCoeffs(q, G)
+    c_p1 = pc.getCommitmentByCoeffs(p1)
+    c_p2 = pc.getCommitmentByCoeffs(p2)
+    c_q = pc.getCommitmentByCoeffs(q)
     r = random.randint(0, pc.modulus - 1)
     
     # to verify p1(x) * p2(x) = q(x), find r and evaluate so that they are the same
@@ -209,9 +212,9 @@ def test_prod1_linearization():
     # batch KZG
     mu = random.randint(0, pc.modulus - 1)
     # kx = p1(x) + mu r(x)
-    c_p1 = pc.getCommitmentByCoeffs(p1x, G)
-    c_p2 = pc.getCommitmentByCoeffs(p2x, G)
-    c_q = pc.getCommitmentByCoeffs(qx, G)
+    c_p1 = pc.getCommitmentByCoeffs(p1x)
+    c_p2 = pc.getCommitmentByCoeffs(p2x)
+    c_q = pc.getCommitmentByCoeffs(qx)
     
     kx = pc.pf.add_polys(p1x, pc.pf.mul_polys([mu], rx))
     proof_kx_zeta = pc.getSingleProofAt(kx, zeta, 0)
@@ -227,7 +230,8 @@ def test_prod1_linearization():
 
 
 def test_batch():
-    # Test batch KZG with mul polys
+    # Test batch KZG with mul polys with single pairing
+    # e(sum(c_i * r^i) + sum(proof_i * x_i * r^i)  -  sum(r^i y_i), [1]) = e(sum(proof_i * r^i), [1])
 
     pc = PolyCommitment()
     order = 16
@@ -240,10 +244,9 @@ def test_batch():
     qs = []
     cs = []
     r = random.randint(0, pc.modulus - 1) # random linear combination
-    # e(sum(c_i * r^i) + sum(proof_i * x_i * r^i)  -  sum(r^i y_i), [1]) = e(sum(proof_i * r^i), [])
     for i in range(npoly):
         p = [random.randint(0, pc.modulus -1) for i in range(4)]
-        c = pc.getCommitmentByCoeffs(p, G)
+        c = pc.getCommitmentByCoeffs(p)
         ps.append(p)
         x = random.randint(0, pc.modulus - 1)
         y = pc.pf.eval_poly_at(p, x)
@@ -266,9 +269,79 @@ def test_batch():
     print("test_batch passd")
 
 
+def test_zero():
+    # Test if a poly is zero in a subgroup
+
+    pc = PolyCommitment()
+    degree = 16
+    G = pc.pf.exp(7, (pc.pf.modulus-1) // degree)
+    order = 4
+    G0 = pc.pf.exp(7, (pc.pf.modulus-1) // order)
+
+    # construct a poly with subgroup zero
+    evals = [0 if i % order == 0 else random.randint(0, pc.modulus -1) for i in range(16)]
+    p = fft(evals, pc.modulus, G, inv=True)
+    cp = pc.getCommitmentByCoeffs(p)
+    # vanishing poly
+    z = [pc.modulus - 1] + [0] * (order - 1) + [1]
+
+    # TODO: shift fft to improve div
+    q, rem = pc.pf.div_polys_with_rem(p, z)
+    cq = pc.getCommitmentByCoeffs(q)
+    assert rem == [0] * order
+
+    r = pc.rand()
+    py = pc.pf.eval_poly_at(p, r)
+    qy = pc.pf.eval_poly_at(q, r)
+
+    # TODO: query py, qy with cp and cq (batch)
+    assert py == qy * (pow(r, order, pc.modulus) - 1) % pc.modulus
+    print("test_zero passed")
+
+def test_prod_one():
+    # Test if the prod of a poly in a subgroup is 1
+
+    pc = PolyCommitment()
+
+    order = 4
+    omega = pc.pf.exp(7, (pc.pf.modulus-1) // order)
+    evals = [pc.rand() for i in range(order - 1)]
+    
+
+    # construct t such that t(w^0) = 1, t(wx) = f(x) t(x)
+    # (note that it is a bit different with lecture notes)
+    t = [1]
+    for x in evals:
+        t.append(t[-1] * x % pc.modulus)
+    evals.append(pc.pf.div(1, t[-1]))
+    coeffs = fft(evals, pc.modulus, omega, inv=True)
+    c_p = pc.getCommitmentByCoeffs(coeffs)
+
+    coeffs_t = fft(t, pc.modulus, omega, inv=True)
+    c_t = pc.getCommitmentByCoeffs(coeffs_t)
+
+    coeffs_t1 = pc.pf.sub_polys(pc.pf.shift_poly(coeffs_t, omega), pc.pf.mul_polys(coeffs, coeffs_t))
+
+    # vanishing poly
+    z = [pc.modulus - 1] + [0] * (order - 1) + [1]
+    q, rem = pc.pf.div_polys_with_rem(coeffs_t1, z)
+    assert rem == [0] * order
+
+    r = pc.rand()
+    # TODO: query t(wr), f(r), t(r), f(1), q(r) (using batch)
+    t_wr = pc.pf.eval_poly_at(coeffs_t, omega * r)
+    f_r = pc.pf.eval_poly_at(coeffs, r)
+    t_r = pc.pf.eval_poly_at(coeffs_t,  r)
+    q_r = pc.pf.eval_poly_at(q, r)
+    assert q_r * (pow(r, order, pc.modulus) - 1) % pc.modulus == (t_wr - f_r * t_r) % pc.modulus
+    print("test_prod_one passed")
+
+
 if __name__ == "__main__":
-    test_poly_commitment()
-    test_batch()
+    # test_poly_commitment()
+    # test_batch()
+    # test_zero()
+    test_prod_one()
     # test_full_poly()
     # test_prod1()
     test_prod1_linearization()

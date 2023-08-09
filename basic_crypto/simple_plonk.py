@@ -253,9 +253,11 @@ def test_simple_plonk():
 
     # assignments
     # T(w^-1) = T(w^0)
-    # T(w^-2) = T(w^1)
+    # T(w^-2) = T(w^1) = T(w^3)
     # T(w^-3) = T(w^4)
+    # T(w^-4) = T(w^8)
     # T(w^2) = T(w^6)
+    # T(w^5) = T(w^7)
     order = 16
     pc = PolyCommitment()
     g = pc.pf.exp(7, (pc.pf.modulus-1) // order)

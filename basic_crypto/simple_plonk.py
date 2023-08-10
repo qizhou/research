@@ -1,4 +1,5 @@
-# A simple polynomial commitment interface
+# A simple plonk/PCS example code following
+# zk-learning.org lecture 5
 
 import random
 
@@ -111,7 +112,7 @@ def test_prod_one():
     f_r = pc.pf.eval_poly_at(coeffs, r)
     t_r = pc.pf.eval_poly_at(coeffs_t,  r)
     q_r = pc.pf.eval_poly_at(q, r)
-    # assert f(1)= 1
+    # assert t(1)= 1
     assert q_r * (pow(r, order, pc.modulus) - 1) % pc.modulus == (t_wr - f_r * t_r) % pc.modulus
     print("test_prod_one passed")
 

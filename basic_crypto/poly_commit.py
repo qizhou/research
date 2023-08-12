@@ -32,6 +32,21 @@ class PolyCommitment:
             self.setup_vec2.append(self.G2 * (self.secret ** i))
         return self.setup_vec2[0:length]
 
+    def toPointSetup1(self, length):
+        # convert KZG coefficient setup to point-evaluation setup
+        assert (length - 1) & length == 0
+        poly = [self.modulus - 1] + [0] * (length - 1) + [1]
+        g = self.pf.exp(7, (self.pf.modulus-1) // length)
+        psetup = []
+        csetup = self.getSetupVector1(length)
+        for i in range(length):
+            # L_i(x) = \frac{\omega_i(x^N - 1) }{N (x - \omega_i)}
+            ppoly, rem = self.pf.div_polys_with_rem(poly, self.pf.mul_by_const([self.modulus - pow(g, i, self.modulus), 1], self.pf.inv(pow(g, i, self.modulus)) * length))
+            assert rem == [0]
+            p = sum(p * c for p, c in zip(ppoly, csetup))
+            psetup.append(p)
+        return psetup
+
     # get the commitment of a polynomial in evaluation form
     # return a curve point
     def getCommitment(self, evals, g):
@@ -229,12 +244,25 @@ def test_prod1_linearization():
     print("test_prod1_linearization passed")
 
 
+def test_point_setup():
+    pc = PolyCommitment()
+    order = 16
+    g = pc.pf.exp(7, (pc.pf.modulus-1) // order)
+
+    point_setup = pc.toPointSetup1(order)
+
+    points = [pc.rand() for i in range(order)]
+    coeffs = fft(points, pc.modulus, g, inv=True)
+
+    c0 = pc.getCommitmentByCoeffs(coeffs)
+    c1 = sum(x * y for x, y in zip(point_setup, points))
+    assert c0 == c1
+    print("test_point_setup passed")
+
+
 if __name__ == "__main__":
+    test_point_setup()
     test_poly_commitment()
     test_full_poly()
     test_prod1()
     test_prod1_linearization()
-        
-        
-        
-    

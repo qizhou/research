@@ -61,7 +61,7 @@ def test_zero():
     evals = [0 if i % order == 0 else random.randint(0, pc.modulus -1) for i in range(16)]
     p = fft(evals, pc.modulus, G, inv=True)
     cp = pc.getCommitmentByCoeffs(p)
-    # vanishing poly
+    # vanishing poly (x^4 - 1)
     z = [pc.modulus - 1] + [0] * (order - 1) + [1]
 
     # TODO: shift fft to improve div
@@ -181,14 +181,6 @@ def test_prescribed_permutation():
 
     order = 4
     omega = pc.pf.exp(7, (pc.pf.modulus-1) // order)
-    p0 = [pc.rand() for i in range(order)]
-    p1 = p0[:]
-    random.shuffle(p1)
-    coeffs_p0 = fft(p0, pc.modulus, omega, inv=True)
-    coeffs_p1 = fft(p1, pc.modulus, omega, inv=True)
-
-    c_p0 = pc.getCommitmentByCoeffs(coeffs_p0)
-    c_p1 = pc.getCommitmentByCoeffs(coeffs_p1)
 
     p0 = [pc.rand() for i in range(order)]
     seq0 = [i for i in range(order)] # can be simply seq0(x) = x

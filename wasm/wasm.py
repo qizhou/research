@@ -20,15 +20,27 @@ Func = namedtuple("Func", ["vec_locals", "expr"])
 Locals = namedtuple("Locals", ["n", "t"])
         
 
-class Reader:
+class WasmReader:
     def __init__(self, r):
         self.r = r        
+    
+    def _read(self, size=1):
+        return self.r.read(size)
+    
+    def _readByte(self):
+        b = self.r.read(1)
+        if len(b) == 0:
+            raise EOFError()
+        return b[0]
+    
+    def _readAll(self):
+        return self.r.read(-1)
     
     def readU32(self):
         v = 0
         m = 1
         while True:
-            x = self.readByte()
+            x = self._readByte()
             if x >= 128:
                 v += m * (x - 128)
             else:
@@ -37,31 +49,19 @@ class Reader:
             m *= 128
         return v
     
-    def read(self, size=1):
-        return self.r.read(size)
-    
-    def readByte(self):
-        b = self.r.read(1)
-        if len(b) == 0:
-            raise EOFError()
-        return b[0]
-    
-    def readAll(self):
-        return self.r.read(-1)
-    
     def readFuncType(self):
-        b = self.readByte()
+        b = self._readByte()
         assert b == 0x60 # func type
         return (self.readResultType(), self.readResultType())
 
     def readValType(self):
-        valtype = self.readByte()
+        valtype = self._readByte()
         if valtype not in VALUE_TYPES:
             raise Exception("unsupported valtype {}".format(valtype))
         return valtype
     
     def readRefType(self):
-        reftype = self.readByte()
+        reftype = self._readByte()
         assert reftype == REF_TYPE_EXTERNREF or reftype == REF_TYPE_FUNCREF
         return reftype
         
@@ -81,38 +81,41 @@ class Reader:
     
     def readExport(self):
         return (self.readName(), self.readExportDesc())
+    
+    def readBytes(self):
+        size = self.readU32()
+        return self._read(size)
 
     def readName(self):
-        size = self.readU32()
-        return self.read(size)
-
+        return self.readBytes()
+        
     def readExportDesc(self):
-        t = self.readByte()
-        idx = self.readByte()
+        t = self._readByte()
+        idx = self._readByte()
         assert t in {0, 1, 2, 3}
         # check IDX
         return (t, idx)
     
     def readFunc(self):
-        return Func(self.readVecOf(self.readLocals), self.readAll())
+        return Func(self.readVecOf(self.readLocals), self._readAll())
 
     def readExpr(self):
         pass
     
     def readLocals(self):
-        return Locals(self.readByte(), self.readValType())
-    
+        return Locals(self._readByte(), self.readValType())
+        
     def readCode(self):
         size = self.readU32()
-        bs = self.read(size)
-        r = Reader(io.BytesIO(bs))
+        bs = self._read(size)
+        r = WasmReader(io.BytesIO(bs))
         return Code(size, r.readFunc())
     
     def readTable(self):
         return self.readVecOf(self.readRefType)
     
     def readLimits(self):
-        t = self.readByte()
+        t = self._readByte()
         if t == 0:
             return (self.readU32(), 2 ** 32 - 1)
         else:
@@ -120,10 +123,20 @@ class Reader:
         
     def readGlobalType(self):
         # mutable, valtype
-        return (self.readByte(), self.readValType())
+        return (self._readByte(), self.readValType())
     
     def readGlobal(self):
         return (self.readGlobalType(), self.readExpr())
+    
+    def readData(self):
+        t = self._readByte()
+        if t == 0:
+            return (0, self.readExpr(), self.readBytes())
+        elif t == 1:
+            return (1, self.readBytes())
+        elif t == 2:
+            return (2, self.readU32(), self.readExpr(), self.readBytes)
+        
 
 
 class Module:
@@ -138,82 +151,88 @@ class Module:
             return
         
         self.sectionHandler = {
+            0: self.handleCustomSection,
             1: self.handleTypeSection,
             3: self.handleFuncSection,
             4: self.handleTableSection,
             5: self.handleMemorySection,
             6: self.handleGlobalSection,
             7: self.handleExportSecion,
-            10: self.handleCodeSection
+            10: self.handleCodeSection,
+            11: self.handleDataSection,
         }
 
     def __init__(self, r):
         self.__init_class()
 
         # magic
-        assert r.read(4) == bytes.fromhex("0061736d")
+        assert r._read(4) == bytes.fromhex("0061736d")
         # version
-        assert r.read(4) == bytes.fromhex("01000000")
+        assert r._read(4) == bytes.fromhex("01000000")
 
         # section
         while True:
             try:
-                sid = r.readByte()
+                sid = r._readByte()
             except EOFError:
                 break
             if sid not in self.sectionHandler:
                 raise Exception("{} section id not supported".format(sid))
             size = r.readU32()
-            bs = r.read(size)
-            self.sectionHandler[sid](bs)
+            bsr = WasmReader(io.BytesIO(r._read(size)))
+            self.sectionHandler[sid](bsr)
 
-    def handleTypeSection(self, bs):
+    def handleTypeSection(self, r):
         print("detect type")
-        r = Reader(io.BytesIO(bs))
-        self.types = r.readType()
-        print("types = {}".format(self.types))
+        self.typeSec = r.readType()
+        print("types = {}".format(self.typeSec))
 
-    def handleFuncSection(self, bs):
+    def handleFuncSection(self, r):
         print("detect func")
-        r = Reader(io.BytesIO(bs))
-        self.funcs = r.readVecOf(r.readU32)
-        print("funcs = {}".format(self.funcs))
+        self.funcSec = r.readVecOf(r.readU32)
+        print("funcs = {}".format(self.funcSec))
 
-    def handleExportSecion(self, bs):
+    def handleExportSecion(self, r):
         print("detect func")
-        r = Reader(io.BytesIO(bs))
-        self.exports = r.readVecOf(r.readExport)
-        print("exports = {}".format(self.exports))
+        self.exportSec = r.readVecOf(r.readExport)
+        print("exports = {}".format(self.exportSec))
 
-    def handleCodeSection(self, bs):
+    def handleCodeSection(self, r):
         print("detect code")
-        r = Reader(io.BytesIO(bs))
-        self.codes = r.readVecOf(r.readCode)
-        print("codes = {}".format(self.codes))
+        self.codeSec = r.readVecOf(r.readCode)
+        print("codes = {}".format(self.codeSec))
 
-    def handleTableSection(self, bs):
+    def handleTableSection(self, r):
         print("detect table")
-        r = Reader(io.BytesIO(bs))
-        self.tables = r.readVecOf(r.readRefType)
-        print("tables = {}", self.tables)
+        self.tableSec = r.readVecOf(r.readRefType)
+        print("tables = {}".format(self.tableSec))
 
-    def handleMemorySection(self, bs):
+    def handleMemorySection(self, r):
         print("detect memory")
-        r = Reader(io.BytesIO(bs))
-        self.memory = r.readVecOf(r.readLimits)
-        print("memory = {}", self.memory)
+        self.memorySec = r.readVecOf(r.readLimits)
+        print("memory = {}".format(self.memorySec))
 
-    def handleGlobalSection(self, bs):
+    def handleGlobalSection(self, r):
         print("detect global")
-        r = Reader(io.BytesIO(bs))
         self.globals = r.readGlobal()
-        print("globals = {}", self.globals)
+        print("globals = {}".format(self.globals))
+
+    def handleDataSection(self, r):
+        print("detect data")
+        self.dataSec = r.readVecOf(r.readData)
+        print("dataSec = {}".format(self.dataSec))
+
+    def handleCustomSection(self, r: WasmReader):
+        print("detect custom")
+        self.customSec = (r.readName(), r._readAll())
+        print("customSec = {}".format(self.customSec))
+
         
 
 def test():
     filename = sys.argv[1] if len(sys.argv) >= 2 else "test.wasm"
     with open(filename, "rb") as f:
-        m = Module(Reader(f))
+        m = Module(WasmReader(f))
 
 if __name__ == "__main__":
     test()

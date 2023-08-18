@@ -1,4 +1,5 @@
 import io
+import sys
 from collections import namedtuple
 
 NUM_TYPE_I32 = 0x7F
@@ -58,6 +59,11 @@ class Reader:
         if valtype not in VALUE_TYPES:
             raise Exception("unsupported valtype {}".format(valtype))
         return valtype
+    
+    def readRefType(self):
+        reftype = self.readByte()
+        assert reftype == REF_TYPE_EXTERNREF or reftype == REF_TYPE_FUNCREF
+        return reftype
         
     def readResultType(self):
         size = self.readU32()
@@ -101,6 +107,23 @@ class Reader:
         bs = self.read(size)
         r = Reader(io.BytesIO(bs))
         return Code(size, r.readFunc())
+    
+    def readTable(self):
+        return self.readVecOf(self.readRefType)
+    
+    def readLimits(self):
+        t = self.readByte()
+        if t == 0:
+            return (self.readU32(), 2 ** 32 - 1)
+        else:
+            return (self.readU32(), self.readU32())
+        
+    def readGlobalType(self):
+        # mutable, valtype
+        return (self.readByte(), self.readValType())
+    
+    def readGlobal(self):
+        return (self.readGlobalType(), self.readExpr())
 
 
 class Module:
@@ -117,6 +140,9 @@ class Module:
         self.sectionHandler = {
             1: self.handleTypeSection,
             3: self.handleFuncSection,
+            4: self.handleTableSection,
+            5: self.handleMemorySection,
+            6: self.handleGlobalSection,
             7: self.handleExportSecion,
             10: self.handleCodeSection
         }
@@ -162,11 +188,31 @@ class Module:
     def handleCodeSection(self, bs):
         print("detect code")
         r = Reader(io.BytesIO(bs))
-        self.code = r.readVecOf(r.readCode)
-        print("code = {}".format(self.code))
+        self.codes = r.readVecOf(r.readCode)
+        print("codes = {}".format(self.codes))
+
+    def handleTableSection(self, bs):
+        print("detect table")
+        r = Reader(io.BytesIO(bs))
+        self.tables = r.readVecOf(r.readRefType)
+        print("tables = {}", self.tables)
+
+    def handleMemorySection(self, bs):
+        print("detect memory")
+        r = Reader(io.BytesIO(bs))
+        self.memory = r.readVecOf(r.readLimits)
+        print("memory = {}", self.memory)
+
+    def handleGlobalSection(self, bs):
+        print("detect global")
+        r = Reader(io.BytesIO(bs))
+        self.globals = r.readGlobal()
+        print("globals = {}", self.globals)
+        
 
 def test():
-    with open("test.wasm", "rb") as f:
+    filename = sys.argv[1] if len(sys.argv) >= 2 else "test.wasm"
+    with open(filename, "rb") as f:
         m = Module(Reader(f))
 
 if __name__ == "__main__":

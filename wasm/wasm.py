@@ -1,4 +1,5 @@
 import io
+from collections import namedtuple
 
 NUM_TYPE_I32 = 0x7F
 NUM_TYPE_I64 = 0x7E
@@ -12,6 +13,11 @@ VALUE_TYPES = {
     NUM_TYPE_I32, NUM_TYPE_I64, NUM_TYPE_F32, NUM_TYPE_F64,
     VEC_TYPE, REF_TYPE_FUNCREF, REF_TYPE_EXTERNREF
 }
+
+Code = namedtuple("Code", ["size", "func"])
+Func = namedtuple("Func", ["vec_locals", "expr"])
+Locals = namedtuple("Locals", ["n", "t"])
+        
 
 class Reader:
     def __init__(self, r):
@@ -34,7 +40,13 @@ class Reader:
         return self.r.read(size)
     
     def readByte(self):
-        return self.r.read(1)[0]
+        b = self.r.read(1)
+        if len(b) == 0:
+            raise EOFError()
+        return b[0]
+    
+    def readAll(self):
+        return self.r.read(-1)
     
     def readFuncType(self):
         b = self.readByte()
@@ -55,14 +67,40 @@ class Reader:
         return rt
     
     def readType(self):
-        len = self.readU32()
-        print("type len = {}".format(len))
-        ts = []
-        for _ in range(len):
-            ft = self.readFuncType()
-            print(ft)
-            ts.append(ft)
-        return ts
+        return self.readVecOf(self.readFuncType)
+    
+    def readVecOf(self, readFunc):
+        size = self.readU32()
+        return [readFunc() for _ in range(size)]
+    
+    def readExport(self):
+        return (self.readName(), self.readExportDesc())
+
+    def readName(self):
+        size = self.readU32()
+        return self.read(size)
+
+    def readExportDesc(self):
+        t = self.readByte()
+        idx = self.readByte()
+        assert t in {0, 1, 2, 3}
+        # check IDX
+        return (t, idx)
+    
+    def readFunc(self):
+        return Func(self.readVecOf(self.readLocals), self.readAll())
+
+    def readExpr(self):
+        pass
+    
+    def readLocals(self):
+        return Locals(self.readByte(), self.readValType())
+    
+    def readCode(self):
+        size = self.readU32()
+        bs = self.read(size)
+        r = Reader(io.BytesIO(bs))
+        return Code(size, r.readFunc())
 
 
 class Module:
@@ -77,8 +115,10 @@ class Module:
             return
         
         self.sectionHandler = {
-            1: self.typeHandler,
-            3: self.funcHandler
+            1: self.handleTypeSection,
+            3: self.handleFuncSection,
+            7: self.handleExportSecion,
+            10: self.handleCodeSection
         }
 
     def __init__(self, r):
@@ -90,19 +130,40 @@ class Module:
         assert r.read(4) == bytes.fromhex("01000000")
 
         # section
-        sid = r.readByte()
-        if sid not in self.sectionHandler:
-            raise Exception("{} section id not supported".format(sid))
-        size = r.readU32()
-        bs = r.read(size)
-        self.sectionHandler[sid](bs)
+        while True:
+            try:
+                sid = r.readByte()
+            except EOFError:
+                break
+            if sid not in self.sectionHandler:
+                raise Exception("{} section id not supported".format(sid))
+            size = r.readU32()
+            bs = r.read(size)
+            self.sectionHandler[sid](bs)
 
-    def typeHandler(self, bs):
+    def handleTypeSection(self, bs):
         print("detect type")
         r = Reader(io.BytesIO(bs))
         self.types = r.readType()
-        
+        print("types = {}".format(self.types))
 
+    def handleFuncSection(self, bs):
+        print("detect func")
+        r = Reader(io.BytesIO(bs))
+        self.funcs = r.readVecOf(r.readU32)
+        print("funcs = {}".format(self.funcs))
+
+    def handleExportSecion(self, bs):
+        print("detect func")
+        r = Reader(io.BytesIO(bs))
+        self.exports = r.readVecOf(r.readExport)
+        print("exports = {}".format(self.exports))
+
+    def handleCodeSection(self, bs):
+        print("detect code")
+        r = Reader(io.BytesIO(bs))
+        self.code = r.readVecOf(r.readCode)
+        print("code = {}".format(self.code))
 
 def test():
     with open("test.wasm", "rb") as f:

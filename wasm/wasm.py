@@ -75,12 +75,17 @@ class WasmReader:
     def readType(self):
         return self.readVecOf(self.readFuncType)
     
+    def readTableType(self):
+        return (self.readRefType(), self.readLimits())
+    
     def readVecOf(self, readFunc):
         size = self.readU32()
         return [readFunc() for _ in range(size)]
     
     def readExport(self):
-        return (self.readName(), self.readExportDesc())
+        name = self.readName()
+        desc = self.readExportDesc()
+        return (name, desc)
     
     def readBytes(self):
         size = self.readU32()
@@ -91,7 +96,7 @@ class WasmReader:
         
     def readExportDesc(self):
         t = self._readByte()
-        idx = self._readByte()
+        idx = self.readU32()
         assert t in {0, 1, 2, 3}
         # check IDX
         return (t, idx)
@@ -136,7 +141,26 @@ class WasmReader:
             return (1, self.readBytes())
         elif t == 2:
             return (2, self.readU32(), self.readExpr(), self.readBytes)
+        else:
+            assert False
         
+    def readImport(self):
+        modname = self.readName()
+        name = self.readName()
+        t = self._readByte()
+        if t == 0:
+            # typeidx => func[typeidx]
+            # TODO: check func exists
+            return (modname, name, t, self.readU32())
+        elif t == 1:
+            return (modname, name, t, self.readTableType())
+        elif t == 2:
+            # memory type
+            return (modname, name, t, self.readLimits())
+        elif t == 3:
+            return (modname, name, t, self.readGlobalType())
+        else:
+            assert False
 
 
 class Module:
@@ -153,6 +177,7 @@ class Module:
         self.sectionHandler = {
             0: self.handleCustomSection,
             1: self.handleTypeSection,
+            2: self.handleImportSection,
             3: self.handleFuncSection,
             4: self.handleTableSection,
             5: self.handleMemorySection,
@@ -179,7 +204,8 @@ class Module:
             if sid not in self.sectionHandler:
                 raise Exception("{} section id not supported".format(sid))
             size = r.readU32()
-            bsr = WasmReader(io.BytesIO(r._read(size)))
+            bs = r._read(size)
+            bsr = WasmReader(io.BytesIO(bs))
             self.sectionHandler[sid](bsr)
 
     def handleTypeSection(self, r):
@@ -192,8 +218,8 @@ class Module:
         self.funcSec = r.readVecOf(r.readU32)
         print("funcs = {}".format(self.funcSec))
 
-    def handleExportSecion(self, r):
-        print("detect func")
+    def handleExportSecion(self, r: WasmReader):
+        print("detect export")
         self.exportSec = r.readVecOf(r.readExport)
         print("exports = {}".format(self.exportSec))
 
@@ -226,6 +252,11 @@ class Module:
         print("detect custom")
         self.customSec = (r.readName(), r._readAll())
         print("customSec = {}".format(self.customSec))
+
+    def handleImportSection(self, r: WasmReader):
+        print("detect import")
+        self.importSec = r.readVecOf(r.readImport)
+        print("importSec = {}".format(self.importSec))
 
         
 

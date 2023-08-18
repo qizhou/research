@@ -105,6 +105,7 @@ class WasmReader:
         return Func(self.readVecOf(self.readLocals), self._readAll())
 
     def readExpr(self):
+        # TODO:
         pass
     
     def readLocals(self):
@@ -163,6 +164,75 @@ class WasmReader:
             assert False
 
 
+class WasmWriter:
+    def __init__(self, w):
+        self.w = w  
+    
+    def _write(self, bs):
+        return self.w.write(bs)
+    
+    def writeU32(self, v):
+        while True:
+            if v >= 128:
+                self._write(bytes([v % 128 + 128]))
+                v = v // 128
+            else:
+                self._write(bytes([v]))
+                break
+
+    def _writeByte(self, b):
+        self._write(bytes([b]))
+
+    def _flush(self):
+        self.w.flush()
+
+    def _getvalue(self):
+        return self.w.getvalue()
+    
+    def writeBytes(self, bs):
+        self.writeU32(len(bs))
+        return self._write(bs)
+
+    def writeName(self, name):
+        return self.writeBytes(name)
+        
+    def writeExportDesc(self, desc):
+        self._writeByte(desc[0])
+        self.writeU32(desc[1])
+
+    def writeExport(self, export):
+        self.writeName(export[0])
+        self.writeExportDesc(export[1])
+
+    def writeVecOf(self, vec, func):
+        self.writeU32(len(vec))
+        for v in vec:
+            func(v)
+
+    def writeImport(self, imp):
+        modname = imp[0]
+        name = imp[1]
+        t = imp[2]
+        self.writeName(modname)
+        self.writeName(name)
+        self._writeByte(t)
+        if t == 0:
+            # typeidx => func[typeidx]
+            self.writeU32(imp[3])
+        elif t == 1: 
+            raise NotImplementedError()
+            #return (modname, name, t, self.readTableType())
+        elif t == 2:
+            raise NotImplementedError()
+            # memory type
+            #return (modname, name, t, self.readLimits())
+        elif t == 3:
+            raise NotImplementedError()
+            # return (modname, name, t, self.readGlobalType())
+        else:
+            assert False
+
+
 class Module:
 
     sectionHandler = {
@@ -183,9 +253,11 @@ class Module:
             5: self.handleMemorySection,
             6: self.handleGlobalSection,
             7: self.handleExportSecion,
+            9: self.handleElementSection,
             10: self.handleCodeSection,
             11: self.handleDataSection,
         }
+        self.inited = True
 
     def __init__(self, r):
         self.__init_class()
@@ -257,6 +329,9 @@ class Module:
         print("detect import")
         self.importSec = r.readVecOf(r.readImport)
         print("importSec = {}".format(self.importSec))
+
+    def handleElementSection(self, r: WasmReader):
+        print("skip element")
 
         
 

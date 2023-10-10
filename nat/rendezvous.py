@@ -22,10 +22,6 @@ print("send receiver address to initiator")
 msg = bytes(rev_addr[0], "ascii") + rev_addr[1].to_bytes(2, byteorder="big")
 sock.sendto(msg, int_addr)
 
-print("waiting initiator to tryhello")
-data, _ = sock.recvfrom(1024)
-# assert addr from initiator
-
 print("send initiator address to receiver")
 msg = bytes(int_addr[0], "ascii") + int_addr[1].to_bytes(2, byteorder="big")
 sock.sendto(msg, rev_addr)

@@ -16,14 +16,8 @@ sock.sendto(b"initiator hello", (RENDEZVOUS_UDP_IP, RENDEZVOUS_UDP_PORT))
 print("waiting for rendezvous relay msg ...")
 data, _ = sock.recvfrom(1024)
 
-# adding a NAT record to receiver (note that receiver may not receive the msg)
 rev_ip = str(data[0:-2], "ascii")
 rev_port = int.from_bytes(data[-2:], byteorder="big")
-print("sending tryhello to receiver at %s:%s" % (rev_ip, rev_port))
-sock.sendto(b"initator tryhello", (rev_ip, rev_port))
-
-print("sending tryhello_done to rendezvous at %s:%s" % (RENDEZVOUS_UDP_IP, RENDEZVOUS_UDP_PORT))
-sock.sendto(b"initator tryhello_done", (RENDEZVOUS_UDP_IP, RENDEZVOUS_UDP_PORT))
 
 sock.settimeout(1.1)
 while True:

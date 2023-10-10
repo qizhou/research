@@ -29,5 +29,5 @@ while True:
     except socket.timeout:
         pass
 
-    print("send message to receiver %s:%s" % (int_ip, int_port))
+    print("send message to initator %s:%s" % (int_ip, int_port))
     sock.sendto(b"receiver hello", (int_ip, int_port))

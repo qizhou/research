@@ -22,7 +22,7 @@ rev_port = int.from_bytes(data[-2:], byteorder="big")
 print("sending tryhello to receiver at %s:%s" % (rev_ip, rev_port))
 sock.sendto(b"initator tryhello", (rev_ip, rev_port))
 
-print("sending tryhello_done to rendezvous at %s:%s" % (rev_ip, rev_port))
+print("sending tryhello_done to rendezvous at %s:%s" % (RENDEZVOUS_UDP_IP, RENDEZVOUS_UDP_PORT))
 sock.sendto(b"initator tryhello_done", (RENDEZVOUS_UDP_IP, RENDEZVOUS_UDP_PORT))
 
 sock.settimeout(1.1)
@@ -33,6 +33,6 @@ while True:
     except socket.timeout:
         pass
 
-    print("send message to initator %s:%s" % (rev_ip, rev_port))
+    print("send message to receiver %s:%s" % (rev_ip, rev_port))
     sock.sendto(b"initator hello", (rev_ip, rev_port))
 

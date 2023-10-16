@@ -1,10 +1,12 @@
-# Prerequisite
+# A Minimum Code to Demonstrate WebRTC Data Channel Between Python3 <> Webpage
+
+## Prerequisite
 
 Run `pip install aiortc`
 
-# How to Run
+## How to Run
 
-## Python (Offer) => Web (Answer)
+### Python (Offer) => Web (Answer)
 
 1. Run `python3 datachannel-cli/cli.py offer` and copy the offer SDP JSON message.
 
@@ -14,7 +16,7 @@ Run `pip install aiortc`
 
 4. The `webrtc.html` in the browser should receive the data from python3 in console.
 
-## Web (Offer) => Python (Answer)
+### Web (Offer) => Python (Answer)
 
 1. Open `webrtc.html#1` in a browser and copy the offer SDP JSON message.
 

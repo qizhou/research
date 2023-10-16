@@ -8,7 +8,7 @@ async def echo(websocket):
         await websocket.send(message)
 
 async def main():
-    async with serve(echo, "localhost", 8765):
+    async with serve(echo, "0.0.0.0", 8765):
         await asyncio.Future()  # run forever
 
 asyncio.run(main())

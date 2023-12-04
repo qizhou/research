@@ -13,6 +13,65 @@ class User:
     
     def __init__(self, id):
         self.id = id
+        self.tokens = dict()  # list of tokens owned by the user
+        self.new_tokens = dict()
+
+    def receive(self, protocol, token_id, proof_history):
+        # Given protocol and the proof_history from last block to deposit, check whether
+        # 1. the tx history proof is correct
+        # 2. the tx history is correct
+        # 3. the last tx in the last block is sent to the user
+        # 4. the first tx is deposit tx
+        owner_id = self.id
+        for i, h in enumerate(reversed(proof_history)):
+            tx, proof = h
+
+            assert protocol.blocks[-(i+1)].verifyProof(protocol.block_hashes[-(i+1)], token_id, tx, proof)
+            if tx.receiver_id == 0 and tx.sender_id == 0:
+                continue
+
+            assert tx.receiver_id == owner_id
+            owner_id = tx.sender_id
+        
+        # check if the first tx is deposit tx
+        if len(proof_history) != len(protocol.blocks):
+            assert len(protocol.blocks[-len(proof_history)].txs) == len(protocol.blocks[-len(proof_history)-1].txs) + 1
+
+    def addToken(self, token_id, proof_history):
+        # Add a token with previous history of sender (if deposit, then it is null)
+        assert not token_id in self.new_tokens
+        self.new_tokens[token_id] = proof_history
+
+    def notifyNewBlock(self, protocol):
+        # TODO: check block no == user block no + 1
+        for k, v in self.new_tokens.items():
+            self.tokens[k] = v
+
+        for token_id, proof_history in self.tokens.items():
+            proof_history.append((protocol.blocks[-1].txs[token_id], protocol.blocks[-1].getProof(token_id)))
+            # NOTE, in the following case, the user will withdraw
+            # 1, (data unavailable) operator may not share block and proof
+            # 2, (invalid block) the block added by the operator is invalid
+            if token_id in self.new_tokens:
+                self.receive(protocol, token_id, proof_history)
+            elif not protocol.blocks[-1].txs[token_id].isEmpty():
+                print("Invalid block, starting withdraw")
+        
+        self.new_tokens = dict()
+
+    def hasToken(self, token_id):
+        return token_id in self.tokens
+    
+    def transfer(self, protocol, token_id, receiver):
+        # transfer a token to user by sending all proof history and sign the Tx
+        protocol.addTx(token_id, self, receiver)
+        receiver.addToken(token_id, self.tokens[token_id])
+        del self.tokens[token_id]
+
+    def deposit(self, protocol):
+        protocol.deposit(self)
+        self.addToken(protocol.tokens-1, [])
+
 
 class PlasmaTx:
     # Simple tx structure without nonce, signature, etc
@@ -26,6 +85,12 @@ class PlasmaTx:
 
     def serialize(self):
         return int.to_bytes(self.sender_id, 4, "big") + int.to_bytes(self.receiver_id, 4, "big")
+    
+    def isEmpty(self):
+        return self.sender_id == 0 and self.receiver_id == 0
+    
+    def __repr__(self) -> str:
+        return "Tx({} {})".format(self.sender_id, self.receiver_id)
 
 class PlasmaBlock:
     def __init__(self, tokens):
@@ -76,21 +141,41 @@ class PlasmaBlock:
             idx = idx // 2
         return node == root
 
-# Plasma contract deployed on L1
-class PlasmaContract:
+# Plasma protocol with contract deployed on L1 and maintained by an operator
+class PlasmaProtocol:
     def __init__(self):
-        self.blocks = []  # maintained by operator, not contract
-        self.tokens = 0
+        self.blocks = []            # maintained by operator, not on contract
+        self.block = None           # block to add, maintained by operator, not on contract
+
+        self.tokens = 0             # available on contract
         self.block_hashes = []
 
     def deposit(self, user):
-        # Create a single block
+        # Create a single block for deposit
         self.tokens += 1
         block = PlasmaBlock(self.tokens)
-        block.txs[-1] = PlasmaTx(user.id, user.id) # Genesis token tx
+        block.txs[-1] = PlasmaTx(0, user.id) # Genesis token tx
         self.blocks.append(block)
         self.block_hashes.append(block.root())
         print("Block {}: Deposited from user {} at token id {} with root {}".format(len(self.block_hashes)-1, user.id, self.tokens-1, self.block_hashes[-1].hex()))
+
+    def newBlock(self):
+        self.block = PlasmaBlock(self.tokens)
+
+    def addTx(self, token_id, sender, receiver):
+        # Transfer a token and add a tx in the block
+        self.block.txs[token_id] = PlasmaTx(sender.id, receiver.id)
+    
+    def commitBlock(self):
+        self.blocks.append(self.block)
+        self.block_hashes.append(self.block.root())
+        self.block = None
+        print("Block {}: Commit new block".format(len(self.block_hashes)-1))
+
+    def commitEmptyBlock(self):
+        self.newBlock()
+        self.commitBlock()
+
 
 def test_blockn(n):
     b = PlasmaBlock(n)
@@ -101,22 +186,94 @@ def test_blockn(n):
         assert b.verifyProof(b.root(), i, b.txs[i], b.getProof(i))
 
 def test_block():
-    test_blockn(1)
-    test_blockn(2)
-    test_blockn(3)
-    test_blockn(10)
-    test_blockn(11)
-    test_blockn(12)
-    test_blockn(13)
-    test_blockn(14)
-    test_blockn(15)
+    for i in range(1, 16):
+        test_blockn(i)
 
+
+def test_simple():
+    # A -> B -> C
+    users = [User.newUser() for i in range(3)]
+
+    pp = PlasmaProtocol()
+    users[0].deposit(pp)
+    [user.notifyNewBlock(pp) for user in users]
+    assert users[0].hasToken(0)
+
+    pp.commitEmptyBlock()
+    [user.notifyNewBlock(pp) for user in users]
+
+    pp.newBlock()
+    users[0].transfer(pp, 0, users[1])
+    pp.commitBlock()
+
+    [user.notifyNewBlock(pp) for user in users]
+    assert users[1].hasToken(0)
+    assert not users[0].hasToken(0)
+
+    pp.newBlock()
+    users[1].transfer(pp, 0, users[2])
+    pp.commitBlock()
+    [user.notifyNewBlock(pp) for user in users]
+    assert users[2].hasToken(0)
+    assert not users[1].hasToken(0)
+
+def test_2token():
+    # A -> C
+    # B -> D
+    users = [User.newUser() for i in range(4)]
+
+    pp = PlasmaProtocol()
+    users[0].deposit(pp)
+    [user.notifyNewBlock(pp) for user in users]
+    assert users[0].hasToken(0)
+
+    users[1].deposit(pp)
+    [user.notifyNewBlock(pp) for user in users]
+    assert users[1].hasToken(1)
+
+    pp.commitEmptyBlock()
+    [user.notifyNewBlock(pp) for user in users]
+
+    pp.newBlock()
+    users[0].transfer(pp, 0, users[2])
+    users[1].transfer(pp, 1, users[3])
+    pp.commitBlock()
+
+    [user.notifyNewBlock(pp) for user in users]
+    assert users[2].hasToken(0)
+    assert not users[0].hasToken(0)
+    assert users[3].hasToken(1)
+    assert not users[1].hasToken(1)
+
+def test_2token_single_sender():
+    # A -> C
+    # B -> D
+    users = [User.newUser() for i in range(3)]
+
+    pp = PlasmaProtocol()
+    users[0].deposit(pp)
+    [user.notifyNewBlock(pp) for user in users]
+    assert users[0].hasToken(0)
+
+    users[0].deposit(pp)
+    [user.notifyNewBlock(pp) for user in users]
+    assert users[0].hasToken(1)
+
+    pp.commitEmptyBlock()
+    [user.notifyNewBlock(pp) for user in users]
+
+    pp.newBlock()
+    users[0].transfer(pp, 0, users[1])
+    users[0].transfer(pp, 1, users[2])
+    pp.commitBlock()
+
+    [user.notifyNewBlock(pp) for user in users]
+    assert users[1].hasToken(0)
+    assert not users[0].hasToken(0)
+    assert users[2].hasToken(1)
+    assert not users[0].hasToken(1)
 
 test_block()
-a = User.newUser()
-b = User.newUser()
-print(a.id, b.id)
-
-pc = PlasmaContract()
-pc.deposit(a)
-pc.deposit(b)
+test_simple()
+test_2token()
+test_2token_single_sender()

@@ -63,7 +63,8 @@ class User:
         return token_id in self.tokens
     
     def transfer(self, protocol, token_id, receiver):
-        # transfer a token to user by sending all proof history and sign the Tx
+        # Transfer a token to user by sending all proof history and sign the Tx
+        # The receiver can acknowledge the token by checking the proof history and the new block includes the Tx
         protocol.addTx(token_id, self, receiver)
         receiver.addToken(token_id, self.tokens[token_id])
         del self.tokens[token_id]
@@ -148,7 +149,7 @@ class PlasmaProtocol:
         self.block = None           # block to add, maintained by operator, not on contract
 
         self.tokens = 0             # available on contract
-        self.block_hashes = []
+        self.block_hashes = []      # available on contract
 
     def deposit(self, user):
         # Create a single block for deposit
@@ -163,7 +164,7 @@ class PlasmaProtocol:
         self.block = PlasmaBlock(self.tokens)
 
     def addTx(self, token_id, sender, receiver):
-        # Transfer a token and add a tx in the block
+        # Add a transfer a token and add a tx in the block
         self.block.txs[token_id] = PlasmaTx(sender.id, receiver.id)
     
     def commitBlock(self):

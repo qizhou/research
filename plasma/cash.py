@@ -1,10 +1,10 @@
 # A simple demo to illustrate plasma cash
 # General protocol:
-# 0, Each user will maintain the proof of owning the token.  The proof is the Merkle proof of the token tx from deposit to last block.
+# 0, Each user will maintain the proof of owning the token.  The proof is the Merkle proof of the token tx from the deposit block to the last block.
 # 1, Upon a new plasma block is produced (with the hash published on-chain),
 # every user will be notified by the operator about the proof of the token of the new block.
-# If the proof if unavailable or proof/tx is invalid, it is DA attack, and the user needs to exit immediately.
-# 2, When a token is transfer to a user, the receiver will receive the proof history and the transfer Tx included in a plamsa block.
+# If the proof if unavailable or proof/tx is invalid, it is DA or invalid attack, and the user needs to exit immediately.
+# 2, When a token is transferred to a user, the receiver will receive the proof history and the transfer Tx included in a plasma block.
 
 import hashlib
 
@@ -26,13 +26,13 @@ class User:
         self.new_tokens = dict()
 
     def receive(self, protocol, token_id, proof_history):
-        # Given protocol and the proof_history from last block to deposit, check whether
+        # Given protocol and the proof_history from the last block to deposit, check whether
         # 1. the tx history proof is correct
         # 2. the tx history is correct
         # 3. the last tx in the last block is sent to the user
-        # 4. the first tx is deposit tx
+        # 4. the first tx is a deposit tx
         owner_id = self.id
-        # Enumerate the history from last block to deposit (reversely)
+        # Enumerate the history from the last block to deposit (reversely)
         for i, h in enumerate(reversed(proof_history)):
             tx, proof = h
 
@@ -44,7 +44,7 @@ class User:
             assert tx.receiver_id == owner_id
             owner_id = tx.sender_id
 
-        # Check if the first tx is deposit tx
+        # Check if the first tx is a deposit tx
         if len(proof_history) != len(protocol.blocks):
             assert len(protocol.blocks[-len(proof_history)].txs) == len(
                 protocol.blocks[-len(proof_history)-1].txs) + 1

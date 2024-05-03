@@ -13,7 +13,14 @@ def forward_fn(w, x):
 def backward_fn(t, w, x):
     return (t - forward_fn(w, x)) * x
 
-t = forward_fn(w, x) + torch.randn(n) # add error
+def forward_fn(w, x):
+    return torch.sigmoid(w @ x)
+
+def backward_fn(t, w, x):
+    o = forward_fn(w, x)
+    return (t - o) * o * (1 - o) * x
+
+t = forward_fn(w, x) + 0.1 * torch.randn(n) # add error
 
 # iterative update
 w_p = torch.randn(n_i) # inital guess

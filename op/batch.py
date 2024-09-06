@@ -47,4 +47,5 @@ class ChannelBuilder:
 # - Output a Frame: https://github.com/ethstorage/optimism/blob/8b173d268bb72738c47f173ebf70f6a9ceaa1985/op-batcher/batcher/channel_builder.go#L347
 # - Frames to Txdata: https://github.com/ethstorage/optimism/blob/8b173d268bb72738c47f173ebf70f6a9ceaa1985/op-batcher/batcher/channel.go#L161
 # - Txdata to calldata or BLOBs: https://github.com/ethstorage/optimism/blob/8b173d268bb72738c47f173ebf70f6a9ceaa1985/op-batcher/batcher/tx_data.go#L44
+# - Default compression ratio: https://github.com/ethstorage/optimism/blob/8b173d268bb72738c47f173ebf70f6a9ceaa1985/op-batcher/flags/flags.go#L88
 

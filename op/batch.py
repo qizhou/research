@@ -16,6 +16,7 @@ class Frame:
         # https://specs.optimism.io/protocol/derivation.html#frame-format
         return self.channel_id.to_bytes(16, "big") + self.frame_number.to_bytes(2, "big"), self.frame_data.to_bytes(4, "big") + self.frame_data + self.is_last.to_bytes(1, "big")
 
+
 class Batch:
     def __init__(self, parent_hash, epoch_number, epoch_hash, timestamp, transaction_list):
         self.parent_hash = parent_hash
@@ -41,5 +42,9 @@ class ChannelBuilder:
         # TODO: close the channel and slice the data to frames
 
         
-
+# Key code:
+# - Create a Frame (none span): https://github.com/ethstorage/optimism/blob/8b173d268bb72738c47f173ebf70f6a9ceaa1985/op-node/rollup/derive/channel_out.go#L190
+# - Output a Frame: https://github.com/ethstorage/optimism/blob/8b173d268bb72738c47f173ebf70f6a9ceaa1985/op-batcher/batcher/channel_builder.go#L347
+# - Frames to Txdata: https://github.com/ethstorage/optimism/blob/8b173d268bb72738c47f173ebf70f6a9ceaa1985/op-batcher/batcher/channel.go#L161
+# - Txdata to calldata or BLOBs: https://github.com/ethstorage/optimism/blob/8b173d268bb72738c47f173ebf70f6a9ceaa1985/op-batcher/batcher/tx_data.go#L44
 

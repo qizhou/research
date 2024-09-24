@@ -24,3 +24,12 @@
 # After reorg
 # -> skip challenged batch: https://github.com/ethstorage/optimism/blob/5a4fbce2bc780a908afeab255513aa38ca3c49b8/op-node/rollup/derive/plasma_data_source.go#L79
 # -> reorg challenged batch: https://github.com/ethstorage/optimism/blob/5a4fbce2bc780a908afeab255513aa38ca3c49b8/op-plasma/dastate.go#L178
+
+# how to choose the re-org point
+# -> PromoteFinalizedEvent: https://github.com/ethereum-optimism/optimism/blob/4428d1070fc7a6c3f072d56afa8a3a26a46a9e09/op-node/rollup/finality/finalizer.go#L247
+# -> EngineController.SetFinalizedHead(): https://github.com/ethereum-optimism/optimism/blob/4428d1070fc7a6c3f072d56afa8a3a26a46a9e09/op-node/rollup/engine/events.go#L421
+# -> TryUpdateEngine(): https://github.com/ethereum-optimism/optimism/blob/4428d1070fc7a6c3f072d56afa8a3a26a46a9e09/op-node/rollup/engine/engine_controller.go#L266
+# -> Rollup.ResetErr (e.g., reorg by AltDA expiration)
+# -> FindL2Heads(): https://github.com/ethereum-optimism/optimism/blob/4428d1070fc7a6c3f072d56afa8a3a26a46a9e09/op-node/rollup/sync/start.go#L114
+# -> ForceEngineResetEvent
+# https://github.com/ethereum-optimism/optimism/blob/4428d1070fc7a6c3f072d56afa8a3a26a46a9e09/op-node/rollup/derive/pipeline.go#L162

@@ -26,6 +26,7 @@ function setup_devnet_prestate() {
 ```
 git clone https://github.com/ethstorage/optimism.git
 cd optimism
+git checkout fp-devnet
 OP_HOME=$(realpath .)
 ```
 

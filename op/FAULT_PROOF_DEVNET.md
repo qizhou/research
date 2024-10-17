@@ -47,7 +47,7 @@ make devnet-clean
 ## Build op-program with Devnet Config
 
 ```
-$ setup_devnet_prestate()
+$ setup_devnet_prestate
 ...
 Cannon Absolute prestate hash:
 0x0384fd1b3e1f41288e21b315f67a691c24bf420d7fb53f9b41f6cad80dc78a50

@@ -1,6 +1,6 @@
-blob_gas_fee = 1
-gas_price = 10 * 10 ** 9
-eth_price = 2500
+blob_gas_fee = 16965135
+gas_price = 25 * 10 ** 9
+eth_price = 4000
 l2tx_size = 100
 blobs_per_l1tx = 5
 blob_size = 120000
@@ -8,7 +8,7 @@ blob_fee_size = 128 * 1024
 
 l2txs_per_l1tx = blob_size * blobs_per_l1tx // l2tx_size
 l1tx_cost = (eth_price * gas_price * 21000 + eth_price * blob_gas_fee * blob_size * blobs_per_l1tx) / 1e18
-print("l1tx_cost {}, l2txs_per_l1_tx {}, l2tx_cost {}".format(l1tx_cost, l2txs_per_l1tx, l1tx_cost / l2txs_per_l1tx))
+print("l1tx_cost {}, l1_per_byte_cost {}, l2txs_per_l1_tx {}, l2tx_cost {}".format(l1tx_cost, l1tx_cost / blob_size / blobs_per_l1tx, l2txs_per_l1tx, l1tx_cost / l2txs_per_l1tx))
 
 # calldataGas*(l1BaseFee*16*l1BaseFeeScalar + l1BlobBaseFee*l1BlobBaseFeeScalar)/16e6
 

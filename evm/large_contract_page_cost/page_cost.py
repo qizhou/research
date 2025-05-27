@@ -73,12 +73,22 @@ def execute(code, print_jump=False):
     return {'num_jumps': num_jumps}
 
 
+def write_code():
+    with open("code_24KB", "wb") as f:
+        f.write(create_code(6, 4096))
+
+    with open("code_256KB", "wb") as f:
+        f.write(create_code(64, 4096))
+
+
 code = create_code(2, 14)
 print(code.hex())
 execute(code, print_jump=True)
         
 code = create_code(3, 4096)
 print(execute(code))
+
+# write_code()
 
 print("24KB")
 code = create_code(6, 4096)

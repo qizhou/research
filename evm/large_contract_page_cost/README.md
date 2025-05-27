@@ -2,6 +2,7 @@ Study the cost of pages when executing a large contract.
 
 The contract contains of multiple pages.  The code will jump to next page to try to evict caches.  The code likes like
 
+```asm
 page_dst0:
     PUSH4 $page1_dst0
     JUMP
@@ -37,3 +38,4 @@ pageM_dstL: // last code segment
     PUSH0
     PUSH0
     RETURN
+```

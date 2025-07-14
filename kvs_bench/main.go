@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/rand"
 	"sync"
+	"time"
 
 	"github.com/syndtr/goleveldb/leveldb"
 )
@@ -29,6 +30,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	startTime := time.Now()
 
 	if *op == "write" || *op == "randwrite" {
 		tsize := *n / int64(*t)
@@ -81,4 +84,7 @@ func main() {
 		}
 		wg.Wait()
 	}
+
+	elapsed := time.Since(startTime)
+	fmt.Printf("used time %f, ops %f\n", elapsed.Seconds(), float64(*n)/elapsed.Seconds())
 }

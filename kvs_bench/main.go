@@ -15,7 +15,8 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb/pebble"
 )
 
-var n = flag.Int64("n", 100000, "number of IOs")
+var n = flag.Int64("n", 1000000, "number of IOs")
+var N = flag.Int64("N", 0, "size of the keys")
 
 var startKeyFlag = flag.Int64("start", 0, "start key")
 var op = flag.String("op", "randwrite", "operation: write, randwrite, read, randread")
@@ -26,6 +27,34 @@ var t = flag.Int("t", 8, "threads")
 var v = flag.Int("v", 3, "verbosity")
 var dbn = flag.Int("dbn", 1, "number of dbs")
 var dbFlag = flag.String("db", "goleveldb", "db type: goleveldb, pebble")
+var valueFlag = flag.String("V", "fnv", "value generator: fnv, simple")
+
+func generateRandomData(size int, seed uint64) []byte {
+	// a simple FNV 64 bytes algorithm
+	if size == 0 {
+		return []byte{}
+	}
+
+	data := make([]byte, (size+7)/8*8)
+	h := uint64(0xcbf29ce484222325) ^ seed
+	for i := 0; i < len(data); i += 8 {
+		h = h * uint64(0x00000100000001b3)
+		binary.BigEndian.PutUint64(data[i:], h)
+	}
+	return data[:size]
+}
+
+func generateKeys() []int64 {
+	keys := make([]int64, *N)
+	for i := int64(0); i < *N; i++ {
+		keys[i] = i + *startKeyFlag
+	}
+
+	if *op == "randwrite" || *op == "randread" {
+		rand.Shuffle(len(keys), func(i, j int) { keys[i], keys[j] = keys[j], keys[i] })
+	}
+	return keys
+}
 
 func main() {
 	flag.Parse()
@@ -52,19 +81,18 @@ func main() {
 
 	startTime := time.Now()
 
+	if *N == 0 {
+		*N = *n
+	} else if *N < *n {
+		panic("Insufficient keys")
+	}
+
 	if *op == "write" || *op == "randwrite" {
 		tsize := *n / int64(*t)
 
 		var wg sync.WaitGroup
 
-		keys := make([]int64, *n)
-		for i := int64(0); i < *n; i++ {
-			keys[i] = i + *startKeyFlag
-		}
-
-		if *op == "randwrite" {
-			rand.Shuffle(len(keys), func(i, j int) { keys[i], keys[j] = keys[j], keys[i] })
-		}
+		keys := generateKeys()
 
 		startTime = time.Now()
 		for ti := 0; ti < *t; ti++ {
@@ -85,9 +113,16 @@ func main() {
 
 					valueSize := keys[i]%int64(*valueSizeBig-*valueSizeSmall) + int64(*valueSizeSmall)
 
-					value := make([]byte, valueSize)
-					for j := 0; j < len(value); j++ {
-						value[j] = byte(int(keys[i]) + j)
+					var value []byte
+					if *valueFlag == "fnv" {
+						value = generateRandomData(int(valueSize), uint64(keys[i]))
+					} else if *valueFlag == "simple" {
+						value = make([]byte, valueSize)
+						for j := 0; j < len(value); j++ {
+							value[j] = byte(int(keys[i]) + j)
+						}
+					} else {
+						panic("unknown value generator")
 					}
 
 					dbs[keys[i]%int64(*dbn)].Put(key, value)
@@ -108,14 +143,7 @@ func main() {
 
 		var wg sync.WaitGroup
 
-		keys := make([]int64, *n)
-		for i := int64(0); i < *n; i++ {
-			keys[i] = i + *startKeyFlag
-		}
-
-		if *op == "randread" {
-			rand.Shuffle(len(keys), func(i, j int) { keys[i], keys[j] = keys[j], keys[i] })
-		}
+		keys := generateKeys()
 
 		startTime = time.Now()
 		for ti := 0; ti < *t; ti++ {

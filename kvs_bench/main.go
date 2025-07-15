@@ -10,7 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/ethdb/leveldb"
+	"github.com/ethereum/go-ethereum/ethdb/pebble"
 )
 
 var n = flag.Int64("n", 100000, "number of IOs")
@@ -23,17 +25,29 @@ var valueSizeBig = flag.Int("S", 51, "value size big (inclusive)")
 var t = flag.Int("t", 8, "threads")
 var v = flag.Int("v", 3, "verbosity")
 var dbn = flag.Int("dbn", 1, "number of dbs")
+var dbFlag = flag.String("db", "goleveldb", "db type: goleveldb, pebble")
 
 func main() {
 	flag.Parse()
 
-	dbs := make([]*leveldb.DB, *dbn)
+	dbs := make([]ethdb.KeyValueStore, *dbn)
 	for i := 0; i < *dbn; i++ {
-		db, err := leveldb.OpenFile(fmt.Sprintf("bench_db_%d", i), nil)
+		// db, err := leveldb.OpenFile(, nil)
+		var db ethdb.KeyValueStore
+		var err error
+		if *dbFlag == "goleveldb" {
+			db, err = leveldb.New(fmt.Sprintf("bench_leveldb_%d", i), 512, 0, "", false)
+		} else if *dbFlag == "pebbledb" {
+			db, err = pebble.New(fmt.Sprintf("bench_pebble_%d", i), 512, 0, "", false)
+		} else {
+			panic("Unknow db")
+		}
+
 		if err != nil {
 			panic(err)
 		}
 		dbs[i] = db
+		defer db.Close()
 	}
 
 	startTime := time.Now()
@@ -52,10 +66,11 @@ func main() {
 			rand.Shuffle(len(keys), func(i, j int) { keys[i], keys[j] = keys[j], keys[i] })
 		}
 
+		startTime = time.Now()
 		for ti := 0; ti < *t; ti++ {
 			endKey := int64(ti+1) * tsize
 			if ti == *t-1 {
-				endKey = *startKeyFlag + *n
+				endKey = *n
 			}
 
 			wg.Add(1)
@@ -75,7 +90,7 @@ func main() {
 						value[j] = byte(int(keys[i]) + j)
 					}
 
-					dbs[keys[i]%int64(*dbn)].Put(key, value, nil)
+					dbs[keys[i]%int64(*dbn)].Put(key, value)
 					if *v == 4 {
 						fmt.Printf("thread: %d, write %d\n", ti, keys[i])
 					} else if *v == 5 {
@@ -102,10 +117,11 @@ func main() {
 			rand.Shuffle(len(keys), func(i, j int) { keys[i], keys[j] = keys[j], keys[i] })
 		}
 
+		startTime = time.Now()
 		for ti := 0; ti < *t; ti++ {
 			endKey := int64(ti+1) * tsize
 			if ti == *t-1 {
-				endKey = *startKeyFlag + *n
+				endKey = *n
 			}
 
 			wg.Add(1)
@@ -120,7 +136,7 @@ func main() {
 
 					valueSize := keys[i]%int64(*valueSizeBig-*valueSizeSmall) + int64(*valueSizeSmall)
 
-					value, err := dbs[keys[i]%int64(*dbn)].Get(key, nil)
+					value, err := dbs[keys[i]%int64(*dbn)].Get(key)
 					if err != nil || len(value) != int(valueSize) {
 						panic("data verification failed")
 					}

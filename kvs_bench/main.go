@@ -19,7 +19,7 @@ var n = flag.Int64("n", 100000, "number of IOs")
 
 var startKeyFlag = flag.Int64("start", 0, "start key")
 var op = flag.String("op", "randwrite", "operation: write, randwrite, read, randread")
-var r = flag.Int64("r", 10000, "report interval")
+var r = flag.Int64("r", 100000, "report interval")
 var valueSizeSmall = flag.Int("s", 50, "value size small")
 var valueSizeBig = flag.Int("S", 51, "value size big (inclusive)")
 var t = flag.Int("t", 8, "threads")
@@ -37,7 +37,7 @@ func main() {
 		var err error
 		if *dbFlag == "goleveldb" {
 			db, err = leveldb.New(fmt.Sprintf("bench_leveldb_%d", i), 512, 0, "", false)
-		} else if *dbFlag == "pebbledb" {
+		} else if *dbFlag == "pebble" {
 			db, err = pebble.New(fmt.Sprintf("bench_pebble_%d", i), 512, 0, "", false)
 		} else {
 			panic("Unknow db")

@@ -90,11 +90,10 @@ func main() {
 	if *op == "write" || *op == "randwrite" {
 		tsize := *n / int64(*t)
 
-		var wg sync.WaitGroup
-
 		keys := generateKeys()
 
 		startTime = time.Now()
+		var wg sync.WaitGroup
 		for ti := 0; ti < *t; ti++ {
 			endKey := int64(ti+1) * tsize
 			if ti == *t-1 {
@@ -141,11 +140,10 @@ func main() {
 	} else if *op == "read" || *op == "randread" {
 		tsize := *n / int64(*t)
 
-		var wg sync.WaitGroup
-
 		keys := generateKeys()
 
 		startTime = time.Now()
+		var wg sync.WaitGroup
 		for ti := 0; ti < *t; ti++ {
 			endKey := int64(ti+1) * tsize
 			if ti == *t-1 {

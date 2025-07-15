@@ -79,7 +79,7 @@ func main() {
 		defer db.Close()
 	}
 
-	startTime := time.Now()
+	var startTime time.Time
 
 	if *N == 0 {
 		*N = *n

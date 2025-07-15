@@ -178,6 +178,8 @@ func main() {
 			}(ti, keys[int64(ti)*tsize:endKey])
 		}
 		wg.Wait()
+	} else {
+		panic("Unknown operation")
 	}
 
 	elapsed := time.Since(startTime)

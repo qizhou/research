@@ -4,13 +4,14 @@ import (
 	"bufio"
 	"encoding/binary"
 	"errors"
+	"io"
 	"os"
 	"sync"
 )
 
 type valueEntry struct {
-	off  int64
-	size int
+	entryOff  int64
+	valueSize int
 }
 
 type Database struct {
@@ -39,17 +40,17 @@ func NewDatabase(path string) (*Database, error) {
 	for off < filesize {
 		data := make([]byte, 8)
 		// TODO: check error
-		reader.Read(data)
+		io.ReadFull(reader, data)
 		totalSize := binary.BigEndian.Uint32(data)
 		keySize := binary.BigEndian.Uint32(data[4:])
 		valueSize := totalSize - keySize
 		key := make([]byte, keySize)
 		value := make([]byte, valueSize)
-		reader.Read(key)
-		reader.Read(value)
+		io.ReadFull(reader, key)
+		io.ReadFull(reader, value)
 		kvEntries[string(key)] = valueEntry{
-			off:  off,
-			size: int(valueSize),
+			entryOff:  off,
+			valueSize: int(valueSize),
 		}
 		off += 8 + int64(len(key)+len(value))
 	}
@@ -65,24 +66,25 @@ func NewDatabase(path string) (*Database, error) {
 func (db *Database) Get(key []byte) ([]byte, error) {
 	s := string(key)
 	db.lock.Lock()
-	defer db.lock.Unlock()
 	v, ok := db.kvEntries[s]
 	if !ok {
+		db.lock.Unlock()
 		return nil, errors.New("not found")
 	}
 
-	value := make([]byte, v.size)
+	value := make([]byte, v.valueSize)
 	actualFileSize := db.filesize - int64(len(db.appendBuf))
-	if v.off >= actualFileSize {
-		copy(value, db.appendBuf[v.off+8+int64(len(key))-actualFileSize:])
+	if v.entryOff >= actualFileSize {
+		copy(value, db.appendBuf[v.entryOff+8+int64(len(key))-actualFileSize:])
+		db.lock.Unlock()
 	} else {
 		// early unlock as reading the file is threadsafe
 		db.lock.Unlock()
-		n, err := db.f.ReadAt(value, v.off+8+int64(len(key)))
+		n, err := db.f.ReadAt(value, v.entryOff+8+int64(len(key)))
 		if err != nil {
 			return nil, err
 		}
-		if n != v.size {
+		if n != v.valueSize {
 			return nil, errors.New("full read failed")
 		}
 	}
@@ -114,7 +116,7 @@ func (db *Database) Put(key []byte, value []byte) error {
 		}
 		db.appendBuf = make([]byte, 0)
 	}
-	db.kvEntries[s] = valueEntry{off: off, size: len(value)}
+	db.kvEntries[s] = valueEntry{entryOff: off, valueSize: len(value)}
 
 	return nil
 }
@@ -131,5 +133,7 @@ func (db *Database) Has(key []byte) (bool, error) {
 }
 
 func (db *Database) Close() error {
+	// TODO: error & threadsafe
+	db.f.WriteAt(db.appendBuf, db.filesize-int64(len(db.appendBuf)))
 	return db.f.Close()
 }

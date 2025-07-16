@@ -1,6 +1,7 @@
 package simple_db
 
 import (
+	"bufio"
 	"encoding/binary"
 	"errors"
 	"os"
@@ -13,10 +14,11 @@ type valueEntry struct {
 }
 
 type Database struct {
-	kvEntry  map[string]valueEntry
-	f        *os.File
-	filesize int64
-	lock     sync.Mutex
+	kvEntries map[string]valueEntry
+	f         *os.File
+	filesize  int64
+	lock      sync.Mutex
+	appendBuf []byte
 }
 
 func NewDatabase(path string) (*Database, error) {
@@ -30,12 +32,33 @@ func NewDatabase(path string) (*Database, error) {
 		return nil, err
 	}
 
-	// TODO: initialize kvEntry
+	filesize := stat.Size()
+	off := int64(0)
+	reader := bufio.NewReader(f)
+	kvEntries := make(map[string]valueEntry)
+	for off < filesize {
+		data := make([]byte, 8)
+		// TODO: check error
+		reader.Read(data)
+		totalSize := binary.BigEndian.Uint32(data)
+		keySize := binary.BigEndian.Uint32(data[4:])
+		valueSize := totalSize - keySize
+		key := make([]byte, keySize)
+		value := make([]byte, valueSize)
+		reader.Read(key)
+		reader.Read(value)
+		kvEntries[string(key)] = valueEntry{
+			off:  off,
+			size: int(valueSize),
+		}
+		off += 8 + int64(len(key)+len(value))
+	}
+
 	return &Database{
-		kvEntry:  make(map[string]valueEntry),
-		f:        f,
-		filesize: stat.Size(),
-		lock:     sync.Mutex{},
+		kvEntries: kvEntries,
+		f:         f,
+		filesize:  filesize,
+		lock:      sync.Mutex{},
 	}, nil
 }
 
@@ -43,45 +66,56 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 	s := string(key)
 	db.lock.Lock()
 	defer db.lock.Unlock()
-	v, ok := db.kvEntry[s]
+	v, ok := db.kvEntries[s]
 	if !ok {
 		return nil, errors.New("not found")
 	}
 
-	// early unlock as reading the file is threadsafe
-	db.lock.Unlock()
 	value := make([]byte, v.size)
-	n, err := db.f.ReadAt(value, v.off+8+int64(len(key)))
-	if err != nil {
-		return nil, err
-	}
-	if n != v.size {
-		return nil, errors.New("full read failed")
+	actualFileSize := db.filesize - int64(len(db.appendBuf))
+	if v.off >= actualFileSize {
+		copy(value, db.appendBuf[v.off+8+int64(len(key))-actualFileSize:])
+	} else {
+		// early unlock as reading the file is threadsafe
+		db.lock.Unlock()
+		n, err := db.f.ReadAt(value, v.off+8+int64(len(key)))
+		if err != nil {
+			return nil, err
+		}
+		if n != v.size {
+			return nil, errors.New("full read failed")
+		}
 	}
 	return value, nil
 }
 
 func (db *Database) Put(key []byte, value []byte) error {
-	data := make([]byte, 8+len(key)+len(value))
+	data := make([]byte, 8)
 	binary.BigEndian.PutUint32(data, uint32(len(key)+len(value)))
 	binary.BigEndian.PutUint32(data[4:], uint32(len(key)))
-	copy(data[8:], key)
-	copy(data[8+len(key):], value)
 	s := string(key)
 
 	db.lock.Lock()
 	defer db.lock.Unlock()
+	db.appendBuf = append(db.appendBuf, data...)
+	db.appendBuf = append(db.appendBuf, key...)
+	db.appendBuf = append(db.appendBuf, value...)
 	off := db.filesize
-	db.filesize += int64(len(data))
-	n, err := db.f.WriteAt(data, off)
-	if err != nil {
-		return err
-	}
+	db.filesize += int64(8 + len(key) + len(value))
 
-	if n != len(data) {
-		return errors.New("failed to write")
+	if len(db.appendBuf) > 256*1024 {
+		n, err := db.f.WriteAt(db.appendBuf, db.filesize-int64(len(db.appendBuf)))
+		if err != nil {
+			return err
+		}
+
+		if n != len(db.appendBuf) {
+			return errors.New("failed to write")
+		}
+		db.appendBuf = make([]byte, 0)
 	}
-	db.kvEntry[s] = valueEntry{off: off, size: len(value)}
+	db.kvEntries[s] = valueEntry{off: off, size: len(value)}
+
 	return nil
 }
 
@@ -92,7 +126,7 @@ func (db *Database) Delete(key []byte) error {
 func (db *Database) Has(key []byte) (bool, error) {
 	db.lock.Lock()
 	defer db.lock.Unlock()
-	_, ok := db.kvEntry[string(key)]
+	_, ok := db.kvEntries[string(key)]
 	return ok, nil
 }
 

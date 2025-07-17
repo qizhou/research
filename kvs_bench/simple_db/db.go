@@ -64,9 +64,8 @@ func NewDatabase(path string) (*Database, error) {
 }
 
 func (db *Database) Get(key []byte) ([]byte, error) {
-	s := string(key)
 	db.lock.Lock()
-	v, ok := db.kvEntries[s]
+	v, ok := db.kvEntries[string(key)]
 	if !ok {
 		db.lock.Unlock()
 		return nil, errors.New("not found")

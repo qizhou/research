@@ -129,8 +129,8 @@ class Tree:
             idx = get_nbit(key, i)
             node_key = node.data[idx*32:idx*32+32]
 
-    def root(self):
-        pass
+    def setRoot(self, root):
+        self.root = root
 
 
 t = Tree()
@@ -143,8 +143,14 @@ t.put(b'\3'+b'\1'*31, b'\2')
 assert t.get(b'\2'+b'\1'*31) == b'\0'
 assert t.get(b'\0'+b'\1'*31) == b'\1'
 assert t.get(b'\3'+b'\1'*31) == b'\2'
+root = t.root
 t.put(b'\131'+b'\1'*31, b'\3')
 assert t.get(b'\2'+b'\1'*31) == b'\0'
 assert t.get(b'\0'+b'\1'*31) == b'\1'
 assert t.get(b'\3'+b'\1'*31) == b'\2'
 assert t.get(b'\131'+b'\1'*31) == b'\3'
+t.setRoot(root)
+assert t.get(b'\2'+b'\1'*31) == b'\0'
+assert t.get(b'\0'+b'\1'*31) == b'\1'
+assert t.get(b'\3'+b'\1'*31) == b'\2'
+assert t.get(b'\131'+b'\1'*31) == None

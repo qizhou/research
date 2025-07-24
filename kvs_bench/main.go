@@ -32,6 +32,7 @@ var valueSizeBig = flag.Int("S", 51, "value size big (inclusive)")
 var t = flag.Int("t", 8, "threads")
 var v = flag.Int("v", 3, "verbosity")
 var handles = flag.Int("handles", 0, "max open files")
+var cache = flag.Int("cache", 512, "cache size")
 var dbn = flag.Int("dbn", 1, "number of dbs")
 var dbFlag = flag.String("db", "goleveldb", "db type: goleveldb, pebble, simple, pebblev2")
 var valueFlag = flag.String("V", "fnv", "value generator: fnv, simple")
@@ -89,13 +90,13 @@ func main() {
 		var err error
 		// cache = 512 is borrowed from https://github.com/QuarkChain/op-geth/blob/aa013db3d548c34e87063c72bed6777ada0fa2ae/eth/ethconfig/config.go#L57
 		if *dbFlag == "goleveldb" {
-			db, err = leveldb.New(fmt.Sprintf("bench_leveldb_%d", i), 512, 0, "", false)
+			db, err = leveldb.New(fmt.Sprintf("bench_leveldb_%d", i), *cache, 0, "", false)
 		} else if *dbFlag == "pebble" {
-			db, err = pebble.New(fmt.Sprintf("bench_pebble_%d", i), 512, *handles, "", false)
+			db, err = pebble.New(fmt.Sprintf("bench_pebble_%d", i), *cache, *handles, "", false)
 		} else if *dbFlag == "simple" {
 			db, err = simple_db.NewDatabase(fmt.Sprintf("bench_simple_%d", i))
 		} else if *dbFlag == "pebblev2" {
-			db, err = pebble_v2.New(fmt.Sprintf("bench_pebblev2_%d", i), 512, *handles)
+			db, err = pebble_v2.New(fmt.Sprintf("bench_pebblev2_%d", i), *cache, *handles)
 		} else {
 			panic("Unknow db")
 		}

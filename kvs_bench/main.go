@@ -31,6 +31,7 @@ var valueSizeSmall = flag.Int("s", 50, "value size small")
 var valueSizeBig = flag.Int("S", 51, "value size big (inclusive)")
 var t = flag.Int("t", 8, "threads")
 var v = flag.Int("v", 3, "verbosity")
+var handles = flag.Int("handles", 0, "max open files")
 var dbn = flag.Int("dbn", 1, "number of dbs")
 var dbFlag = flag.String("db", "goleveldb", "db type: goleveldb, pebble, simple, pebblev2")
 var valueFlag = flag.String("V", "fnv", "value generator: fnv, simple")
@@ -90,11 +91,11 @@ func main() {
 		if *dbFlag == "goleveldb" {
 			db, err = leveldb.New(fmt.Sprintf("bench_leveldb_%d", i), 512, 0, "", false)
 		} else if *dbFlag == "pebble" {
-			db, err = pebble.New(fmt.Sprintf("bench_pebble_%d", i), 512, 0, "", false)
+			db, err = pebble.New(fmt.Sprintf("bench_pebble_%d", i), 512, *handles, "", false)
 		} else if *dbFlag == "simple" {
 			db, err = simple_db.NewDatabase(fmt.Sprintf("bench_simple_%d", i))
 		} else if *dbFlag == "pebblev2" {
-			db, err = pebble_v2.New(fmt.Sprintf("bench_pebblev2_%d", i), 512, 0)
+			db, err = pebble_v2.New(fmt.Sprintf("bench_pebblev2_%d", i), 512, *handles)
 		} else {
 			panic("Unknow db")
 		}

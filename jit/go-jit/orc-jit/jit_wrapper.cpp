@@ -1,0 +1,47 @@
+// jit_wrapper.cpp
+#include "jit_wrapper.h"
+#include <llvm/ADT/StringRef.h>
+#include <llvm/ExecutionEngine/Orc/LLJIT.h>
+#include <llvm/IRReader/IRReader.h>
+#include <llvm/Support/SourceMgr.h>
+#include <llvm/Support/TargetSelect.h>
+#include <memory>
+
+using namespace llvm;
+using namespace llvm::orc;
+
+static std::unique_ptr<LLJIT> J;
+static JITEvaluatedSymbol FibSym;
+
+int init_jit(const char *llvm_ir_file) {
+    InitializeNativeTarget();
+    InitializeNativeTargetAsmPrinter();
+
+    SMDiagnostic Err;
+    LLVMContext Context;
+    auto Mod = parseIRFile(llvm_ir_file, Err, Context);
+    if (!Mod) {
+        Err.print("jit_wrapper", errs());
+        return 1;
+    }
+
+    auto JIT = LLJITBuilder().create();
+    if (!JIT) return 2;
+
+    J = std::move(*JIT);
+    if (auto Err = J->addIRModule(ThreadSafeModule(std::move(Mod), std::make_unique<LLVMContext>())))
+        return 3;
+
+    auto Sym = J->lookup("fib");
+    if (!Sym) return 4;
+
+    FibSym = *Sym;
+    return 0;
+}
+
+int call_fib(int n, uint8_t* result_buf) {
+    using FibFn = void(*)(int32_t, uint8_t*);
+    auto func = (FibFn)FibSym.getAddress();
+    func(n, result_buf);
+    return 0;
+}

@@ -1,5 +1,6 @@
 .PHONY: all build run
 
+# llvm17 is perfered
 all:  build run
 
 build:

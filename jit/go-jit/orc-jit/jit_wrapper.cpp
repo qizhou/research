@@ -5,6 +5,8 @@
 #include <llvm/IRReader/IRReader.h>
 #include <llvm/Support/SourceMgr.h>
 #include <llvm/Support/TargetSelect.h>
+#include <llvm/IR/LegacyPassManager.h>
+#include <llvm/Transforms/IPO/PassManagerBuilder.h>
 #include <memory>
 
 using namespace llvm;
@@ -27,6 +29,22 @@ int init_jit(const char *llvm_ir_file) {
 
     auto JIT = LLJITBuilder().create();
     if (!JIT) return 2;
+
+    // Add optimization transform
+    (*JIT)->getIRTransformLayer().setTransform(
+        [](ThreadSafeModule TSM, const MaterializationResponsibility&) -> Expected<ThreadSafeModule> {
+            TSM.withModuleDo(
+                [](Module &M) {
+                    llvm::legacy::PassManager PM;
+                    llvm::PassManagerBuilder PMB;
+                    PMB.OptLevel = 3; // O3 optimization
+                    PMB.populateModulePassManager(PM);
+                    PM.run(M);
+                }
+            );
+            return TSM;
+        }
+    );
 
     J = std::move(*JIT);
     if (auto Err = J->addIRModule(ThreadSafeModule(std::move(Mod), std::make_unique<LLVMContext>())))

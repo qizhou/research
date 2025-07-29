@@ -2,9 +2,17 @@ package main
 
 import (
 	"fmt"
+	"math/big"
+	"time"
+	"unsafe"
 
 	"tinygo.org/x/go-llvm"
 )
+
+// #include <stdint.h>
+// typedef void (*fib)(uint32_t, uint8_t* buf);
+// static void call_fib(uint64_t f, uint32_t x, uint8_t* buf) { ((fib)f)(x, buf); }
+import "C"
 
 func main() {
 	llvm.InitializeNativeTarget()
@@ -13,13 +21,13 @@ func main() {
 	ctx := llvm.NewContext()
 	module := ctx.NewModule("fib_module")
 
-	// Define i32 fib(i32)
-	fib_args := []llvm.Type{ctx.Int32Type()}
-	uint_type := ctx.IntType(64)
-	fib_type := llvm.FunctionType(uint_type, fib_args, false)
+	uint_type := ctx.IntType(256)
+	fib_args := []llvm.Type{ctx.Int32Type(), llvm.PointerType(uint_type, 0)}
+	fib_type := llvm.FunctionType(ctx.VoidType(), fib_args, false)
 	fib_func := llvm.AddFunction(module, "fib", fib_type)
 	fib_func.SetFunctionCallConv(llvm.CCallConv)
 	n := fib_func.Param(0)
+	out := fib_func.Param(1)
 
 	entry := llvm.AddBasicBlock(fib_func, "entry")
 	loop_block := llvm.AddBasicBlock(fib_func, "loop")
@@ -56,29 +64,40 @@ func main() {
 
 	builder.SetInsertPointAtEnd(after_loop_block)
 	result := builder.CreateLoad(uint_type, a_ptr, "result")
-	builder.CreateRet(result)
+	builder.CreateStore(result, out)
+	builder.CreateRetVoid()
 
 	err := llvm.VerifyModule(module, llvm.ReturnStatusAction)
 	if err != nil {
 		panic(fmt.Sprintf("failed to verify module: %s", err))
 	}
 
-	options := llvm.NewMCJITCompilerOptions()
-	options.SetMCJITOptimizationLevel(2)
-	options.SetMCJITEnableFastISel(true)
-	options.SetMCJITNoFramePointerElim(true)
-	options.SetMCJITCodeModel(llvm.CodeModelJITDefault)
-	engine, err := llvm.NewMCJITCompiler(module, options)
+	engine, err := llvm.NewJITCompiler(module, 3)
 	if err != nil {
 		panic(fmt.Sprintf("Error creating JIT: %s", err))
 	}
 	defer engine.Dispose()
 
-	exec_args := []llvm.GenericValue{llvm.NewGenericValueFromInt(ctx.Int32Type(), 10, false)}
-	exec_res := engine.RunFunction(fib_func, exec_args)
-	// var fib uint64 = 55
-	// if exec_res.Int(false) != fib {
-	// 	panic(fmt.Sprintf("Expected %d, got %d", fib, exec_res.Int(false)))
-	// }
-	fmt.Println(exec_res.IntWidth())
+	pointer := engine.GetFunctionAddress("fib")
+	fmt.Println(pointer)
+	input := 10001
+	now := time.Now()
+	// Buffer to receive 32 bytes of result
+	var buf [32]byte
+	C.call_fib(C.uint64_t(pointer), C.uint32_t(input), (*C.uchar)(unsafe.Pointer(&buf[0])))
+	// Convert little endian 32 bytes to big.Int
+	reversed := reverse(buf[:])
+	res := new(big.Int).SetBytes(reversed)
+	fmt.Printf(fmt.Sprintf("llvm: fib(%d) = %s, used time %d ns\n", input, res.String(), time.Now().Sub(now).Nanoseconds()))
+	if res.String() != "100569663553364666514085384053693927634549891439552765559319131137058237310013" {
+		panic("wrong result")
+	}
+}
+
+func reverse(b []byte) []byte {
+	out := make([]byte, len(b))
+	for i := range b {
+		out[len(b)-1-i] = b[i]
+	}
+	return out
 }

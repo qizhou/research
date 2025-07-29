@@ -7,7 +7,7 @@ binding.initialize_native_target()
 binding.initialize_native_asmprinter()
 
 # bits of large integer
-N = 128
+N = 256
 M = N // 8 # bytes
 
 def create_execution_engine():
@@ -31,10 +31,11 @@ def build_fib256_ir():
     # 64 works as expected
     intN = ir.IntType(N)
     int32 = ir.IntType(32)
-    func_type = ir.FunctionType(intN, [int32])
+    func_type = ir.FunctionType(ir.VoidType(), [int32, ir.PointerType(intN)])
     fib_func = ir.Function(module, func_type, name="fib")
 
     n = fib_func.args[0]
+    out = fib_func.args[1]
     n.name = "n"
 
     # Create blocks
@@ -78,7 +79,8 @@ def build_fib256_ir():
     # === After loop ===
     builder.position_at_start(after_loop_block)
     result = builder.load(a_ptr, name="result")
-    builder.ret(result)
+    builder.store(result, out)
+    builder.ret_void()
 
     return module
 
@@ -102,13 +104,19 @@ def main():
 
     # Define function: returns M bytes
     # Simulate as void* return and interpret as N-bit integer
-    restype = ctypes.c_ubyte * M
-    fib_cfunc = ctypes.CFUNCTYPE(restype, ctypes.c_int32)(func_ptr)
+    fib_cfunc = ctypes.CFUNCTYPE(None, ctypes.c_int32, ctypes.c_char_p)(func_ptr)
 
-    for i in range(0, 101, 2):
-        raw = fib_cfunc(i)
-        result = int.from_bytes(bytes(raw), "little")
+    buf = ctypes.create_string_buffer(M)
+
+    for i in range(0, 10001, 1000):
+        fib_cfunc(i, buf)
+        result = int.from_bytes(bytes(buf), "little")
         print(f"fib({i}) = {result}")
+
+    i = 10001
+    fib_cfunc(i, buf)
+    result = int.from_bytes(bytes(buf), "little")
+    assert result == 100569663553364666514085384053693927634549891439552765559319131137058237310013
 
 if __name__ == "__main__":
     main()

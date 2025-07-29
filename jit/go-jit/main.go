@@ -79,19 +79,25 @@ func main() {
 	defer engine.Dispose()
 
 	pointer := engine.GetFunctionAddress("fib")
-	fmt.Println(pointer)
+
 	input := 10001
 	now := time.Now()
-	// Buffer to receive 32 bytes of result
+	// // Buffer to receive 32 bytes of result
 	var buf [32]byte
 	C.call_fib(C.uint64_t(pointer), C.uint32_t(input), (*C.uchar)(unsafe.Pointer(&buf[0])))
 	// Convert little endian 32 bytes to big.Int
-	reversed := reverse(buf[:])
-	res := new(big.Int).SetBytes(reversed)
-	fmt.Printf(fmt.Sprintf("llvm: fib(%d) = %s, used time %d ns\n", input, res.String(), time.Now().Sub(now).Nanoseconds()))
+	res := new(big.Int).SetBytes(reverse(buf[:]))
+	fmt.Printf("llvm getFunctionAddress(): fib(%d) = %s, used time %d ns\n", input, res.String(), time.Now().Sub(now).Nanoseconds())
 	if res.String() != "100569663553364666514085384053693927634549891439552765559319131137058237310013" {
 		panic("wrong result")
 	}
+
+	now1 := time.Now()
+	var buf1 [32]byte
+	exec_args := []llvm.GenericValue{llvm.NewGenericValueFromInt(ctx.Int32Type(), uint64(input), false), llvm.NewGenericValueFromPointer(unsafe.Pointer(&buf1[0]))}
+	engine.RunFunction(fib_func, exec_args)
+	res1 := new(big.Int).SetBytes(reverse(buf1[:]))
+	fmt.Printf("llvm runFunction(): fib(%d) = %s, used time %d ns\n", input, res1.String(), time.Now().Sub(now1).Nanoseconds())
 }
 
 func reverse(b []byte) []byte {

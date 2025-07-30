@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math/big"
+	"os"
 	"time"
 	"unsafe"
 
@@ -115,6 +116,37 @@ func main() {
 	engine.RunFunction(fib_func, exec_args)
 	res1 := new(big.Int).SetBytes(reverse(buf1[:]))
 	fmt.Printf("llvm runFunction(): fib(%d) = %s, used time %d ns\n", input, res1.String(), time.Now().Sub(now1).Nanoseconds())
+
+	// Write to files
+	os.WriteFile("fib.ll", []byte(module.String()), 0644)
+
+	// Write to object file
+	target, err := llvm.GetTargetFromTriple(llvm.DefaultTargetTriple())
+	if err != nil {
+		panic(err)
+	}
+
+	targetMachine := target.CreateTargetMachine(
+		llvm.DefaultTargetTriple(), "generic", "", llvm.CodeGenLevelDefault,
+		llvm.RelocDefault, llvm.CodeModelDefault)
+
+	mem, err := targetMachine.EmitToMemoryBuffer(module, llvm.ObjectFile)
+	if err != nil {
+		panic(err)
+	}
+	os.WriteFile("fib.o", mem.Bytes(), 0644)
+
+	mem, err = targetMachine.EmitToMemoryBuffer(module, llvm.AssemblyFile)
+	if err != nil {
+		panic(err)
+	}
+	os.WriteFile("fib.asm", mem.Bytes(), 0644)
+
+	file, err := os.OpenFile("fib.bc", os.O_CREATE|os.O_RDWR, 0644)
+	if err != nil {
+		panic(err)
+	}
+	llvm.WriteBitcodeToFile(module, file)
 }
 
 func reverse(b []byte) []byte {

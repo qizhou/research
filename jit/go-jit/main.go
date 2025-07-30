@@ -12,7 +12,13 @@ import (
 // #include <stdint.h>
 // typedef void (*fib)(uint32_t, uint8_t* buf);
 // static void call_fib(uint64_t f, uint32_t x, uint8_t* buf) { ((fib)f)(x, buf); }
+// extern void hostLogFunc(char* msg);
 import "C"
+
+//export hostLogFunc
+func hostLogFunc(msg *C.char) {
+	fmt.Println("Host Log:", C.GoString(msg))
+}
 
 func main() {
 	llvm.InitializeNativeTarget()
@@ -21,6 +27,12 @@ func main() {
 	ctx := llvm.NewContext()
 	module := ctx.NewModule("fib_module")
 
+	// host function
+	i8ptr := llvm.PointerType(ctx.Int8Type(), 0)
+	hostLogType := llvm.FunctionType(ctx.VoidType(), []llvm.Type{i8ptr}, false)
+	logFunc := llvm.AddFunction(module, "host_log", hostLogType)
+
+	// fibonnaci
 	uint_type := ctx.IntType(256)
 	fib_args := []llvm.Type{ctx.Int32Type(), llvm.PointerType(uint_type, 0)}
 	fib_type := llvm.FunctionType(ctx.VoidType(), fib_args, false)
@@ -65,6 +77,10 @@ func main() {
 	builder.SetInsertPointAtEnd(after_loop_block)
 	result := builder.CreateLoad(uint_type, a_ptr, "result")
 	builder.CreateStore(result, out)
+
+	str := builder.CreateGlobalStringPtr("hello world!", "msg")
+	builder.CreateCall(hostLogType, logFunc, []llvm.Value{str}, "")
+
 	builder.CreateRetVoid()
 
 	err := llvm.VerifyModule(module, llvm.ReturnStatusAction)
@@ -78,6 +94,7 @@ func main() {
 	}
 	defer engine.Dispose()
 
+	engine.AddGlobalMapping(logFunc, unsafe.Pointer(C.hostLogFunc))
 	pointer := engine.GetFunctionAddress("fib")
 
 	input := 10001

@@ -46,6 +46,11 @@ func main() {
 	fmt.Println(fmt.Sprintf("llvm: fib(%d) = %s, used time %d ns", n, res.String(), time.Now().Sub(now).Nanoseconds()))
 	now = time.Now()
 	fmt.Println(fmt.Sprintf("native: fib(%d) = %s, used time %d ns", n, fib(n).String(), time.Now().Sub(now).Nanoseconds()))
+
+	fmt.Println("loading fib.o")
+	if C.init_jit(C.CString("../fib.o")) != 0 {
+		log.Fatal("Failed to initialize JIT")
+	}
 }
 
 func reverse(b []byte) []byte {

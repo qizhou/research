@@ -4,7 +4,7 @@
 all:  build run
 
 build:
-	@echo $(CGO_CXXFLAGS)
+	llc -filetype=obj -O3 fib.ll -o fib.o
 	go build -o main
 
 run:

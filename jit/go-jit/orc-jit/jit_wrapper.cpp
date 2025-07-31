@@ -66,19 +66,19 @@ int init_jit_from_obj(const char *obj_file) {
     InitializeNativeTargetAsmParser();
 
     auto JIT = LLJITBuilder().create();
-    if (!JIT) return 2;
+    if (!JIT) return 1;
 
     // Load fib.o into a memory buffer
     auto ObjBuffer = MemoryBuffer::getFile(obj_file);
-    if (!ObjBuffer) return 3;
+    if (!ObjBuffer) return 2;
 
     // Add the object to the JIT
-    auto ret = (*JIT)->addObjectFile(std::move(*ObjBuffer));
-    if (!ret) return 4;
+    auto err = (*JIT)->addObjectFile(std::move(*ObjBuffer));
+    if (err) return 3;
 
     J = std::move(*JIT);
     auto Sym = J->lookup("fib");
-    if (!Sym) return 5;
+    if (!Sym) return 4;
 
     FibSym = *Sym;
     return 0;

@@ -22,13 +22,64 @@ func hostLogFunc(msg *C.char) {
 }
 
 func main() {
+	// fibonnaci
+	// // host function
+	// i8ptr := llvm.PointerType(ctx.Int8Type(), 0)
+	// hostLogType := llvm.FunctionType(ctx.VoidType(), []llvm.Type{i8ptr}, false)
+	// logFunc := llvm.AddFunction(module, "host_log", hostLogType)
+	// str := builder.CreateGlobalStringPtr("hello world!", "msg")
+	// builder.CreateCall(hostLogType, logFunc, []llvm.Value{str}, "")
+	// host function
+	// engine.AddGlobalMapping(logFunc, unsafe.Pointer(C.hostLogFunc))
+	// // Buffer to receive 32 bytes of result
+	// Convert little endian 32 bytes to big.Int
+	// Write to files
+	// Write to object file
+	compileAndRunFib()
+	loadFib()
+}
+
+func loadFib() {
 	llvm.InitializeNativeTarget()
 	llvm.InitializeNativeAsmPrinter()
 
 	ctx := llvm.NewContext()
 	module := ctx.NewModule("fib_module")
 
-	// fibonnaci
+	engine, err := llvm.NewJITCompiler(module, 3)
+	if err != nil {
+		panic(fmt.Sprintf("Error creating JIT: %s", err))
+	}
+	defer engine.Dispose()
+
+	pointer := engine.GetFunctionAddress("fib")
+	fmt.Println("fib func pointer", pointer)
+
+	fmt.Println("loading fib.o")
+	now := time.Now()
+	engine.AddObjectFileByFilename("fib.o")
+	fmt.Printf("loaded used time %d ns\n", time.Now().Sub(now).Nanoseconds())
+
+	pointer = engine.GetFunctionAddress("fib")
+	fmt.Println("fib func pointer", pointer)
+
+	input := 10001
+	now = time.Now()
+
+	var buf [32]byte
+	C.call_fib(C.uint64_t(pointer), C.uint32_t(input), (*C.uchar)(unsafe.Pointer(&buf[0])))
+
+	res := new(big.Int).SetBytes(reverse(buf[:]))
+	fmt.Printf("llvm getFunctionAddress(): fib(%d) = %s, used time %d ns\n", input, res.String(), time.Now().Sub(now).Nanoseconds())
+}
+
+func compileAndRunFib() {
+	llvm.InitializeNativeTarget()
+	llvm.InitializeNativeAsmPrinter()
+
+	ctx := llvm.NewContext()
+	module := ctx.NewModule("fib_module")
+
 	uint_type := ctx.IntType(256)
 	fib_args := []llvm.Type{ctx.Int32Type(), llvm.PointerType(uint_type, 0)}
 	fib_type := llvm.FunctionType(ctx.VoidType(), fib_args, false)
@@ -74,13 +125,6 @@ func main() {
 	result := builder.CreateLoad(uint_type, a_ptr, "result")
 	builder.CreateStore(result, out)
 
-	// // host function
-	// i8ptr := llvm.PointerType(ctx.Int8Type(), 0)
-	// hostLogType := llvm.FunctionType(ctx.VoidType(), []llvm.Type{i8ptr}, false)
-	// logFunc := llvm.AddFunction(module, "host_log", hostLogType)
-	// str := builder.CreateGlobalStringPtr("hello world!", "msg")
-	// builder.CreateCall(hostLogType, logFunc, []llvm.Value{str}, "")
-
 	builder.CreateRetVoid()
 
 	err := llvm.VerifyModule(module, llvm.ReturnStatusAction)
@@ -94,16 +138,14 @@ func main() {
 	}
 	defer engine.Dispose()
 
-	// host function
-	// engine.AddGlobalMapping(logFunc, unsafe.Pointer(C.hostLogFunc))
 	pointer := engine.GetFunctionAddress("fib")
 
 	input := 10001
 	now := time.Now()
-	// // Buffer to receive 32 bytes of result
+
 	var buf [32]byte
 	C.call_fib(C.uint64_t(pointer), C.uint32_t(input), (*C.uchar)(unsafe.Pointer(&buf[0])))
-	// Convert little endian 32 bytes to big.Int
+
 	res := new(big.Int).SetBytes(reverse(buf[:]))
 	fmt.Printf("llvm getFunctionAddress(): fib(%d) = %s, used time %d ns\n", input, res.String(), time.Now().Sub(now).Nanoseconds())
 	if res.String() != "100569663553364666514085384053693927634549891439552765559319131137058237310013" {
@@ -117,10 +159,8 @@ func main() {
 	res1 := new(big.Int).SetBytes(reverse(buf1[:]))
 	fmt.Printf("llvm runFunction(): fib(%d) = %s, used time %d ns\n", input, res1.String(), time.Now().Sub(now1).Nanoseconds())
 
-	// Write to files
 	os.WriteFile("fib.ll", []byte(module.String()), 0644)
 
-	// Write to object file
 	target, err := llvm.GetTargetFromTriple(llvm.DefaultTargetTriple())
 	if err != nil {
 		panic(err)

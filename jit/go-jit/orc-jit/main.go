@@ -35,16 +35,16 @@ func main() {
 	// Buffer to receive 32 bytes of result
 	var buf [32]byte
 
-	n := 10000
+	n := 10000000
 	if C.call_fib(C.int(n), (*C.uchar)(unsafe.Pointer(&buf[0]))) != 0 {
 		log.Fatal("Failed to call fib")
 	}
 
 	// Convert little endian 32 bytes to big.Int
-	fmt.Println(fmt.Sprintf("llvm: fib(%d) = %s, used time %d ns", n, new(big.Int).SetBytes(reverse(buf[:])).String(), time.Now().Sub(now).Nanoseconds()))
+	fmt.Println(fmt.Sprintf("llvm: fib(%d) = %s, used time %d ns, ops %d", n, new(big.Int).SetBytes(reverse(buf[:])).String(), time.Now().Sub(now).Nanoseconds(), int64(n)*1000000000/time.Now().Sub(now).Nanoseconds()))
 
 	now = time.Now()
-	fmt.Println(fmt.Sprintf("native: fib(%d) = %s, used time %d ns", n, fib(n).String(), time.Now().Sub(now).Nanoseconds()))
+	fmt.Println(fmt.Sprintf("native: fib(%d) = %s, used time %d ns, ops %d", n, fib(n).String(), time.Now().Sub(now).Nanoseconds(), int64(n)*1000000000/time.Now().Sub(now).Nanoseconds()))
 
 	fmt.Println("loading fib.o")
 	if ret := C.init_jit_from_obj(C.CString("fib.o")); ret != 0 {
@@ -55,7 +55,7 @@ func main() {
 	if C.call_fib(C.int(n), (*C.uchar)(unsafe.Pointer(&buf[0]))) != 0 {
 		log.Fatal("Failed to call fib")
 	}
-	fmt.Println(fmt.Sprintf("llvm: fib(%d) = %s, used time %d ns", n, new(big.Int).SetBytes(reverse(buf[:])).String(), time.Now().Sub(now).Nanoseconds()))
+	fmt.Println(fmt.Sprintf("llvm: fib(%d) = %s, used time %d ns, ops %d", n, new(big.Int).SetBytes(reverse(buf[:])).String(), time.Now().Sub(now).Nanoseconds(), int64(n)*1000000000/time.Now().Sub(now).Nanoseconds()))
 }
 
 func reverse(b []byte) []byte {

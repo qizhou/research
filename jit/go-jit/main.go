@@ -22,6 +22,8 @@ func hostLogFunc(msg *C.char) {
 }
 
 func main() {
+	llvm.InitializeNativeTarget()
+	llvm.InitializeNativeAsmPrinter()
 	// fibonnaci
 	// // host function
 	// i8ptr := llvm.PointerType(ctx.Int8Type(), 0)
@@ -35,16 +37,12 @@ func main() {
 	// Convert little endian 32 bytes to big.Int
 	// Write to files
 	// Write to object file
-	compileAndRunFib()
 	compileAndRunFrac()
-	loadFib()
+	loadFibCode(compileAndRunFib())
 	loadDynamic()
 }
 
-func loadFib() {
-	llvm.InitializeNativeTarget()
-	llvm.InitializeNativeAsmPrinter()
-
+func loadFibCode(compiledCode []byte) {
 	ctx := llvm.NewContext()
 	module := ctx.NewModule("fib_module")
 
@@ -57,9 +55,9 @@ func loadFib() {
 	pointer := engine.GetFunctionAddress("fib")
 	fmt.Println("fib func pointer", pointer)
 
-	fmt.Println("loading fib.o")
+	fmt.Println("loading fib.o from memory")
 	now := time.Now()
-	engine.AddObjectFileByFilename("fib.o")
+	engine.AddObjectFileFromBuffer(compiledCode)
 	fmt.Printf("loaded used time %d ns\n", time.Now().Sub(now).Nanoseconds())
 
 	pointer = engine.GetFunctionAddress("fib")
@@ -76,9 +74,6 @@ func loadFib() {
 }
 
 func loadDynamic() {
-	llvm.InitializeNativeTarget()
-	llvm.InitializeNativeAsmPrinter()
-
 	ctx := llvm.NewContext()
 	module := ctx.NewModule("fib_module")
 
@@ -126,9 +121,6 @@ func loadDynamic() {
 }
 
 func compileAndRunFrac() {
-	llvm.InitializeNativeTarget()
-	llvm.InitializeNativeAsmPrinter()
-
 	ctx := llvm.NewContext()
 	module := ctx.NewModule("frac_module")
 
@@ -227,10 +219,7 @@ func compileAndRunFrac() {
 	llvm.WriteBitcodeToFile(module, file)
 }
 
-func compileAndRunFib() {
-	llvm.InitializeNativeTarget()
-	llvm.InitializeNativeAsmPrinter()
-
+func compileAndRunFib() (c []byte) {
 	ctx := llvm.NewContext()
 	module := ctx.NewModule("fib_module")
 
@@ -324,13 +313,13 @@ func compileAndRunFib() {
 		llvm.DefaultTargetTriple(), "generic", "", llvm.CodeGenLevelDefault,
 		llvm.RelocDefault, llvm.CodeModelDefault)
 
-	mem, err := targetMachine.EmitToMemoryBuffer(module, llvm.ObjectFile)
+	compiledCode, err := targetMachine.EmitToMemoryBuffer(module, llvm.ObjectFile)
 	if err != nil {
 		panic(err)
 	}
-	os.WriteFile("fib.o", mem.Bytes(), 0644)
+	os.WriteFile("fib.o", compiledCode.Bytes(), 0644)
 
-	mem, err = targetMachine.EmitToMemoryBuffer(module, llvm.AssemblyFile)
+	mem, err := targetMachine.EmitToMemoryBuffer(module, llvm.AssemblyFile)
 	if err != nil {
 		panic(err)
 	}
@@ -341,6 +330,7 @@ func compileAndRunFib() {
 		panic(err)
 	}
 	llvm.WriteBitcodeToFile(module, file)
+	return compiledCode.Bytes()
 }
 
 func reverse(b []byte) []byte {

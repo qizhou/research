@@ -15,7 +15,6 @@
 #include <sys/mman.h>
 #include <setjmp.h>
 
-
 static uint8_t* v;
 jmp_buf buf;
 void segfault_handler(int signum, siginfo_t *info, void *context);
@@ -52,21 +51,15 @@ void segfault_handler(int signum, siginfo_t *info, void *context) {
 int main() {
     register_segfault_handler();
 
-    void* ptr = mmap(NULL, 40*1024, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+    void* ptr = mmap(NULL, 40*1024, PROT_NONE, MAP_PRIVATE | MAP_ANON, -1, 0);
     printf("Allocated 40KB at %p, errno %d\n", ptr, errno);
     v = ptr;
-    v[0] = 1;
-    if (munmap(ptr, 4096) != 0) {
-        printf("munmap failed\n");
+
+    printf("Setting rw permissions on [4K, 36K)");
+    if (mprotect(ptr+4*1024, 32*1024, PROT_READ | PROT_WRITE) == -1) {
+        perror("mprotect error");
+        exit(EXIT_FAILURE);
     }
-    void* ptr1 = mmap(ptr, 4*1024, PROT_NONE, MAP_PRIVATE | MAP_ANON, -1, 0);
-    printf("Re-allocated 4KB at %p, errno %d\n", ptr1, errno);
-    void *stackEnd = (void *)(ptr+32*1024+4096);
-    if (munmap(stackEnd, 4096) != 0) {
-        printf("munmap failed\n");
-    }
-    void* ptr2 = mmap(stackEnd, 4*1024, PROT_NONE, MAP_PRIVATE | MAP_ANON, -1, 0);
-    printf("Re-allocated 4KB at %p, errno %d\n", ptr2, errno);
 
     printf("Accessing 4KB should succeed\n");
     v[4096] = 1;

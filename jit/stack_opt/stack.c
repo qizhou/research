@@ -4,7 +4,8 @@
 // and thus avoiding the underflow check.
 // For overflow, static analysis can also help, but it is complicated to study the maximum of the stack depth.
 // The idea here is to allocate 32KB + 8KB = 40KB memory via mmap, with first 4KB and last 4KB being PROT_NONE.
-// Then underflow and overflow access will trigger SEGFAULT automatically.
+// Then underflow and overflow access will trigger SEGSEGV automatically, which will be captured.
+// An recovery will be attempted if underflow or overflow is detected (i.e., addr is in underflow/overflow memory).
 
 #include <stdio.h>
 #include <stdint.h>

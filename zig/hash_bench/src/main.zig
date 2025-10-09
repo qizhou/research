@@ -2,6 +2,13 @@ const std = @import("std");
 const keccak256 = @import("crypto/keccak256_accel.zig");
 const clap = @import("clap");
 
+// Import the necessary C headers for pthreads on Linux
+const c = @cImport({
+    @cDefine("_GNU_SOURCE", "1");
+    @cInclude("pthread.h");
+    @cInclude("sched.h");
+});
+
 var tid: u64 = 0;
 var mutex = std.Thread.Mutex{};
 var n: u64 = 0;
@@ -28,6 +35,7 @@ pub fn main() !void {
         \\-r, --report <u64>   Report interval.
         \\-v, --verbosity <u64> Verbosity.
         \\-t, --thread <u64>   Number of threads.
+        \\--pin <u64>         Pin threads, 0 unpin, 1 pin.
     );
 
     // Initialize our diagnostics, which can be used for reporting useful errors.
@@ -49,10 +57,25 @@ pub fn main() !void {
     r = res.args.report orelse 1000000;
     v = res.args.verbosity orelse 3;
     const t = res.args.thread orelse 1;
+    const pin = res.args.pin orelse 0;
     var gTimer = try std.time.Timer.start();
 
     const taskFn = struct {
-        pub fn call(timer: *std.time.Timer) void {
+        pub fn call(timer: *std.time.Timer, cpu: i32) !void {
+            if (cpu >= 0) {
+                // since zig lacks of cpu set method, we set it manually
+                var set: std.os.linux.cpu_set_t = .{0} ** 16;
+
+                const ucpu: usize = @intCast(cpu);
+                const cpus = @sizeOf(usize) * 8;
+                const x = ucpu / cpus;
+                const y = ucpu % cpus;
+                set[x] = @as(usize, @intCast(1)) << @as(u6, @intCast(y));
+
+                // Use sched_setaffinity with the CPU set
+                try std.os.linux.sched_setaffinity(0, &set);
+            }
+
             while (true) {
                 var output: [32]u8 = undefined;
 
@@ -86,12 +109,17 @@ pub fn main() !void {
     };
 
     var threads = std.ArrayList(std.Thread){};
-    for (0..t) {
-        try threads.append(try std.Thread.spawn(.{}, taskFn.call, .{&gTimer}));
+    for (0..t) |i| {
+        var cpu: i32 = -1;
+        if (pin == 1) {
+            cpu = @intCast(i);
+        }
+
+        try threads.append(gpa.allocator(), try std.Thread.spawn(.{}, taskFn.call, .{ &gTimer, cpu }));
     }
 
     for (0..t) |i| {
-        threads[i].join();
+        threads.items[i].join();
     }
     std.debug.print("used time {}ns, hps {}\n", .{ gTimer.read(), 1000_000_000 * n / gTimer.read() });
 }

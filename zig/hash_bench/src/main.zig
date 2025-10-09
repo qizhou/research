@@ -4,6 +4,10 @@ const clap = @import("clap");
 
 var tid: u64 = 0;
 var mutex = std.Thread.Mutex{};
+var n: u64 = 0;
+var b: u64 = 0;
+var r: u64 = 0;
+var v: u64 = 0;
 
 pub fn main() !void {
     var output1: [32]u8 = undefined;
@@ -23,6 +27,7 @@ pub fn main() !void {
         \\-b, --batch <u64>    Batch size.
         \\-r, --report <u64>   Report interval.
         \\-v, --verbosity <u64> Verbosity.
+        \\-t, --thread <u64>   Number of threads.
     );
 
     // Initialize our diagnostics, which can be used for reporting useful errors.
@@ -39,41 +44,54 @@ pub fn main() !void {
     };
     defer res.deinit();
 
-    const n = res.args.number orelse 100000;
-    const b = res.args.batch orelse 100000;
-    const r = res.args.report orelse 1000000;
-    const v = res.args.verbosity orelse 3;
-    var timer = try std.time.Timer.start();
+    n = res.args.number orelse 100000;
+    b = res.args.batch orelse 100000;
+    r = res.args.report orelse 1000000;
+    v = res.args.verbosity orelse 3;
+    const t = res.args.thread orelse 1;
+    var gTimer = try std.time.Timer.start();
 
-    while (true) {
-        var output: [32]u8 = undefined;
+    const taskFn = struct {
+        pub fn call(timer: *std.time.Timer) void {
+            while (true) {
+                var output: [32]u8 = undefined;
 
-        mutex.lock();
-        const ltid = tid;
-        tid = tid + b;
-        mutex.unlock();
+                mutex.lock();
+                const ltid = tid;
+                tid = tid + b;
+                mutex.unlock();
 
-        if (ltid >= n) {
-            break;
-        }
+                if (ltid >= n) {
+                    break;
+                }
 
-        if (v >= 3 and ltid % r == 0) {
-            std.debug.print("used time {}ns, hps {}\n", .{ timer.read(), 1000_000_000 * ltid / timer.read() });
-        }
+                if (v >= 3 and ltid % r == 0) {
+                    std.debug.print("used time {}ns, hps {}\n", .{ timer.read(), 1000_000_000 * ltid / timer.read() });
+                }
 
-        for (ltid..ltid + b) |j| {
-            var buf: [100]u8 = .{0} ** 100;
+                for (ltid..ltid + b) |j| {
+                    var buf: [100]u8 = .{0} ** 100;
 
-            std.mem.writeInt(u64, buf[92..100], j, std.builtin.Endian.big);
+                    std.mem.writeInt(u64, buf[92..100], j, std.builtin.Endian.big);
 
-            // keccak256.Keccak256_Accel.hash(&buf, &output);
-            std.crypto.hash.sha3.Keccak256.hash(&buf, &output, .{});
+                    // keccak256.Keccak256_Accel.hash(&buf, &output);
+                    std.crypto.hash.sha3.Keccak256.hash(&buf, &output, .{});
 
-            if (v >= 5) {
-                std.debug.print("key: {}, hash: {x}\n", .{ j, &output });
+                    if (v >= 5) {
+                        std.debug.print("key: {}, hash: {x}\n", .{ j, &output });
+                    }
+                }
             }
         }
+    };
+
+    var threads = std.ArrayList(std.Thread){};
+    for (0..t) {
+        try threads.append(try std.Thread.spawn(.{}, taskFn.call, .{&gTimer}));
     }
 
-    std.debug.print("used time {}ns, hps {}\n", .{ timer.read(), 1000_000_000 * n / timer.read() });
+    for (0..t) |i| {
+        threads[i].join();
+    }
+    std.debug.print("used time {}ns, hps {}\n", .{ gTimer.read(), 1000_000_000 * n / gTimer.read() });
 }

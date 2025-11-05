@@ -1,11 +1,14 @@
-// tlb_thrash.c
-// Build:  gcc -O2 -std=c11 -pthread tlb_thrash.c -o tlb_thrash
+// tlb_thrash_evm.c
+// Build:  gcc -O2 -std=c11 -pthread tlb_thrash_evm.c -o tlb_thrash_evm
 // Run examples:
-//   ./tlb_thrash               # defaults (4096 pages, enough to thrash most STLBs)
-//   ./tlb_thrash  256          # ~1MB working set, often fits in STLB
-//   ./tlb_thrash  4096  10     # 4096 pages, 10 passes
-//   sudo taskset -c 1 ./tlb_thrash 4096 10 # pin to CPU 1 (more stable)
-// Notes: Linux; x86-64 assumed 4K pages. Use `perf stat -e dTLB-load-misses` to confirm.
+//   ./tlb_thrash_evm               # defaults (4096 pages, enough to thrash most STLBs)
+//   ./tlb_thrash_evm  256          # ~1MB working set, often fits in STLB
+//   ./tlb_thrash_evm  4096  10     # 4096 pages, 10 passes
+//   sudo taskset -c 1 ./tlb_thrash_evm 4096 10 # pin to CPU 1 (more stable)
+// Notes:
+// - Linux; x86-64 assumed 4K pages. Use `perf stat -e dTLB-load-misses` to confirm.
+// - EVM word size is 32 bytes, so to simulate worst case random access, we randomly access 32B across two consective pages.
+
 
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -44,7 +47,7 @@ int main(int argc, char *argv[]) {
     if (argc >= 2) pages = strtoull(argv[1], NULL, 10);
     if (argc >= 3) passes = strtoull(argv[2], NULL, 10);
 
-    size_t bytes = pages * page_bytes;
+    size_t bytes = (pages + 1) * page_bytes;
     // Page-aligned allocation. Use mmap so we can control hugepage behavior.
     void *buf = mmap(NULL, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (buf == MAP_FAILED) { perror("mmap"); return 1; }
@@ -66,19 +69,25 @@ int main(int argc, char *argv[]) {
     }
 
     // Prefault: touch each page to avoid measuring major page faults
-    for (size_t i = 0; i < pages; i++) {
+    for (size_t i = 0; i < pages+1; i++) {
         volatile uint8_t *p = (volatile uint8_t *)buf + idx[i] * page_bytes;
-        *p = (uint8_t)i;
     }
 
-    // Main measurement loop: touch one 8-byte word per page, random order, repeated.
+    // Main measurement loop: touch one 32-byte word accross two pages, random order, repeated.
     volatile uint64_t sink = 0;
     uint64_t start = nsec_now();
     for (size_t pass = 0; pass < passes; pass++) {
         for (size_t k = 0; k < pages; k++) {
             size_t i = idx[k];
-            volatile uint64_t *p = (volatile uint64_t *)((uint8_t *)buf + i * page_bytes);
-            sink += *p;
+            size_t off = (i+1) * page_bytes - 16;
+            volatile uint64_t *p0 = (volatile uint64_t *)((uint8_t *)buf + off);
+            sink += *p0;
+            volatile uint64_t *p1 = (volatile uint64_t *)((uint8_t *)buf + off + 8);
+            sink += *p1;
+            volatile uint64_t *p2 = (volatile uint64_t *)((uint8_t *)buf + off + 16);
+            sink += *p2;
+            volatile uint64_t *p3 = (volatile uint64_t *)((uint8_t *)buf + off + 32);
+            sink += *p3;
         }
     }
     uint64_t end = nsec_now();
@@ -89,7 +98,7 @@ int main(int argc, char *argv[]) {
     double mb = bytes / (1024.0 * 1024.0);
 
     printf("Working set: %.1f MiB (%zu pages of 4K)\n", mb, pages);
-    printf("Passes: %zu, total accesses: %.0f (one per page)\n", passes, total_accesses);
+    printf("Passes: %zu, total EVM accesses: %.0f (one per page)\n", passes, total_accesses);
     printf("Time: %.3f ms, %.3f ns/access\n", (end - start)/1e6, ns_per_access);
     printf("Sum: %llu\n", (unsigned long long)sink);
 

@@ -43,9 +43,11 @@ int main(int argc, char *argv[]) {
     const size_t page_bytes = 4096;   // 4K pages
     size_t pages = 4096;              // default: 16 MB working set -> likely thrash STLB on many CPUs
     size_t passes = 5;                // how many sweeps over the working set
+    size_t roff = 0;                  // initial read offset
     int pin = 0;                      // pin to CPU 0
     if (argc >= 2) pages = strtoull(argv[1], NULL, 10);
     if (argc >= 3) passes = strtoull(argv[2], NULL, 10);
+    if (argc >= 4) roff = strtoull(argv[3], NULL, 10);
 
     size_t bytes = (pages + 1) * page_bytes;
     // Page-aligned allocation. Use mmap so we can control hugepage behavior.
@@ -79,7 +81,7 @@ int main(int argc, char *argv[]) {
     for (size_t pass = 0; pass < passes; pass++) {
         for (size_t k = 0; k < pages; k++) {
             size_t i = idx[k];
-            size_t off = (i+1) * page_bytes - 16;
+            size_t off = i * page_bytes+roff;
             volatile uint64_t *p0 = (volatile uint64_t *)((uint8_t *)buf + off);
             sink += *p0;
             volatile uint64_t *p1 = (volatile uint64_t *)((uint8_t *)buf + off + 8);

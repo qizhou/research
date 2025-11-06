@@ -99,7 +99,7 @@ def is_game_blacklisted(url, portal_address, game_address):
     response = requests.post(url, json=payload)
     result = response.json().get("result", "0x")
     
-    # If result is 0x or 0x0, the game is not blacklisted
+    # If result is 0x00, the game is not blacklisted
     # If result is 0x01, the game is blacklisted
     if result == "0x":
         logger.warning(f"Unexpected result from disputeGameBlacklist: {result}")

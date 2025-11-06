@@ -72,7 +72,7 @@ int main(int argc, char *argv[]) {
 
     // Prefault: touch each page to avoid measuring major page faults
     for (size_t i = 0; i < pages+1; i++) {
-        volatile uint8_t *p = (volatile uint8_t *)buf + idx[i] * page_bytes;
+        volatile uint8_t *p = (volatile uint8_t *)buf + i * page_bytes + page_bytes / 2;
     }
 
     // Main measurement loop: touch one 32-byte word accross two pages, random order, repeated.

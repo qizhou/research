@@ -154,6 +154,7 @@ def main():
         while True:
             logger.info("Checking")
             errors = 0
+            blacklisted_count = 0  # Counter for blacklisted games
             msg = ""
 
             bn = get_blocknumber(args.l1_rpc)
@@ -179,6 +180,7 @@ def main():
                         blacklisted = is_game_blacklisted(args.l1_rpc, args.optimism_portal2, game_address)
                         if blacklisted:
                             logger.info(f"Game {game_address} has output mismatch but is blacklisted, skipping alert")
+                            blacklisted_count += 1  # Increment blacklisted counter
                         else:
                             logger.info(f"Malicious Game {game_address} is not blacklisted")
                 
@@ -187,12 +189,12 @@ def main():
                             g["transactionHash"], game_address, l2output, info["output"])
                         errors += 1
 
-            msg += "total {}, successes {}, errors {}".format(len(games), len(games)-errors, errors)
+            msg += "total {}, successes {}, errors {}, blacklisted {}".format(len(games), len(games)-errors-blacklisted_count, errors, blacklisted_count)
 
             logger.info(msg)
 
             if errors != 0 or time.monotonic()-prev_send > args.force_interval:
-                title = "FDG {}, total {}, successes {}, errors {}".format(args.fdg_factory, len(games), len(games)-errors, errors)
+                title = "FDG {}, total {}, successes {}, errors {}, blacklisted {}".format(args.fdg_factory, len(games), len(games)-errors-blacklisted_count, errors, blacklisted_count)
                 send_email(title, msg, args.from_addr, args.to_addr, args.username, args.password)
                 prev_send = time.monotonic()
 

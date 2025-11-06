@@ -140,7 +140,6 @@ def main():
     parser.add_argument("--username", type=str, default="", help="email username")
     parser.add_argument("--password", type=str, default="", help="email password")
     parser.add_argument("--test_email", type=bool, default=False, help="send a test email when start")
-    parser.add_argument("--recipient", type=str, default="", help="email recipient")
     
     args = parser.parse_args()
 
@@ -148,7 +147,7 @@ def main():
     prev_send = time.monotonic()
 
     if args.test_email:
-        title = "test email for {}".format(args.recipient)
+        title = "test email for fdg watcher {}".format(args.fdg_factory)
         send_email(title, "", args.from_addr, args.to_addr, args.username, args.password)
 
     try:

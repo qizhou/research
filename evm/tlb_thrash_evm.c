@@ -71,12 +71,13 @@ int main(int argc, char *argv[]) {
     }
 
     // Prefault: touch each page to avoid measuring major page faults
+    volatile uint64_t sink = 0;
     for (size_t i = 0; i < pages+1; i++) {
-        volatile uint8_t *p = (volatile uint8_t *)buf + i * page_bytes + page_bytes / 2;
+        volatile uint64_t *p = (uint64_t *)((volatile uint8_t *)buf + i * page_bytes);
+        sink += *p;
     }
 
     // Main measurement loop: touch one 32-byte word accross two pages, random order, repeated.
-    volatile uint64_t sink = 0;
     uint64_t start = nsec_now();
     for (size_t pass = 0; pass < passes; pass++) {
         for (size_t k = 0; k < pages; k++) {
@@ -88,7 +89,7 @@ int main(int argc, char *argv[]) {
             sink += *p1;
             volatile uint64_t *p2 = (volatile uint64_t *)((uint8_t *)buf + off + 16);
             sink += *p2;
-            volatile uint64_t *p3 = (volatile uint64_t *)((uint8_t *)buf + off + 32);
+            volatile uint64_t *p3 = (volatile uint64_t *)((uint8_t *)buf + off + 24);
             sink += *p3;
         }
     }

@@ -43,7 +43,7 @@ def get_fdg_games(url, addr, from_block):
     payload = {
         "jsonrpc": "2.0",
         "method": "eth_getLogs",
-        "params": [{"address": addr, "topic": "0x5b565efe82411da98814f356d0e7bcb8f0219b8d970307c5afb4a6903a8b2e35", "fromBlock": hex(from_block), "toBlock": "finalized" }],
+        "params": [{"address": addr, "topics": ["0x5b565efe82411da98814f356d0e7bcb8f0219b8d970307c5afb4a6903a8b2e35"], "fromBlock": hex(from_block), "toBlock": "finalized" }],
         "id": 1,
     }
 
@@ -110,7 +110,8 @@ def main():
     parser.add_argument("--username", type=str, default="", help="email username")
     parser.add_argument("--password", type=str, default="", help="email password")
     parser.add_argument("--test_email", type=bool, default=False, help="send a test email when start")
-
+    parser.add_argument("--recipient", type=str, default="", help="email recipient")
+    
     args = parser.parse_args()
 
     # prev_balance = None
@@ -120,13 +121,15 @@ def main():
         title = "test email for {}".format(args.recipient)
         send_email(title, "", args.from_addr, args.to_addr, args.username, args.password)
 
-    bn = get_blocknumber(args.l1_rpc)
-    games = get_fdg_games(args.l1_rpc, args.fdg_factory, bn - args.blocks)
 
     while True:
         logger.info("Checking")
         errors = 0
         msg = ""
+
+        bn = get_blocknumber(args.l1_rpc)
+        games = get_fdg_games(args.l1_rpc, args.fdg_factory, bn - args.blocks)
+
         for g in games:
             info = get_fdg_game_info(args.l1_rpc, g["transactionHash"])
             l2output = get_l2output(args.l2_rpc, info["blockNumber"])
@@ -136,12 +139,11 @@ def main():
 
         msg += "total {}, successes {}, errors {}".format(len(games), len(games)-errors, errors)
 
-        logger.info("FDG error!")
         logger.info(msg)
 
         if errors != 0 or time.monotonic()-prev_send > args.force_interval:
             title = "FDG {}, total {}, successes {}, errors {}".format(args.fdg_factory, len(games), len(games)-errors, errors)
-            send_email(msg, args.from_addr, args.to_addr, args.username, args.password)
+            send_email(title, msg, args.from_addr, args.to_addr, args.username, args.password)
             prev_send = time.monotonic()
 
         time.sleep(args.check_interval)

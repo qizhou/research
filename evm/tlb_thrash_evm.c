@@ -72,10 +72,13 @@ int main(int argc, char *argv[]) {
 
     // Prefault: touch each page to avoid measuring major page faults
     volatile uint64_t sink = 0;
+    uint64_t start0 = nsec_now();
     for (size_t i = 0; i < pages+1; i++) {
         volatile uint64_t *p = (uint64_t *)((volatile uint8_t *)buf + i * page_bytes);
         sink += *p;
     }
+    uint64_t end0 = nsec_now();
+
 
     // Main measurement loop: touch one 32-byte word accross two pages, random order, repeated.
     uint64_t start = nsec_now();
@@ -101,6 +104,7 @@ int main(int argc, char *argv[]) {
     double mb = bytes / (1024.0 * 1024.0);
 
     printf("Working set: %.1f MiB (%zu pages of 4K)\n", mb, pages);
+    printf("Page fault Time: %.3f ms, %.3f ns/fault\n", (end0 - start0)/1e6, (end0 - start0)/(double)pages);
     printf("Passes: %zu, total EVM accesses: %.0f (one per page)\n", passes, total_accesses);
     printf("Time: %.3f ms, %.3f ns/access\n", (end - start)/1e6, ns_per_access);
     printf("Sum: %llu\n", (unsigned long long)sink);

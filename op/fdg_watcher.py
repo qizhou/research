@@ -5,7 +5,6 @@ import argparse
 import smtplib
 from email.message import EmailMessage
 
-
 FORMAT = "%(asctime)-15s %(message)s"
 logging.basicConfig(format=FORMAT)
 logging.getLogger("jsonrpcclient.client.request").setLevel(logging.WARNING)
@@ -77,6 +76,36 @@ def get_l2output(url, blocknum):
     result = response.json()["result"]
     return result["outputRoot"]
 
+def is_game_blacklisted(url, portal_address, game_address):
+    # Create function signature for disputeGameBlacklist(IDisputeGame)
+    function_signature = "0x45884d32"  # First 4 bytes of keccak256("disputeGameBlacklist(address)")
+    
+    # Pad the game address to 32 bytes
+    padded_address = game_address.replace("0x", "").rjust(64, "0")
+    
+    # Construct the data payload
+    data = function_signature + padded_address
+    
+    payload = {
+        "jsonrpc": "2.0",
+        "method": "eth_call",
+        "params": [{
+            "to": portal_address,
+            "data": data
+        }, "latest"],
+        "id": 1
+    }
+    
+    response = requests.post(url, json=payload)
+    result = response.json().get("result", "0x")
+    
+    # If result is 0x or 0x0, the game is not blacklisted
+    # If result is 0x01, the game is blacklisted
+    if result == "0x":
+        logger.warning(f"Unexpected result from disputeGameBlacklist: {result}")
+    else:
+        return result.strip() == "0x01" or result.strip() == "0x0000000000000000000000000000000000000000000000000000000000000001"
+
 def send_email(title, msg, from_addr, to_addr, username, password):
     emsg = EmailMessage()
     emsg["Subject"] = title
@@ -96,6 +125,7 @@ def main():
     parser.add_argument("--fdg_factory", type=str, help="fdg factory address")
     parser.add_argument("--l1_rpc", type=str, help="l1 rpc")
     parser.add_argument("--l2_rpc", type=str, help="l2_rpc")
+    parser.add_argument("--optimism_portal2", type=str, help="optimism portal2 contract address")
     parser.add_argument(
         "--check_interval", type=int, default=15 * 60, help="interval to query"
     )
@@ -121,32 +151,59 @@ def main():
         title = "test email for {}".format(args.recipient)
         send_email(title, "", args.from_addr, args.to_addr, args.username, args.password)
 
+    try:
+        while True:
+            logger.info("Checking")
+            errors = 0
+            msg = ""
 
-    while True:
-        logger.info("Checking")
-        errors = 0
-        msg = ""
+            bn = get_blocknumber(args.l1_rpc)
+            games = get_fdg_games(args.l1_rpc, args.fdg_factory, bn - args.blocks)
 
-        bn = get_blocknumber(args.l1_rpc)
-        games = get_fdg_games(args.l1_rpc, args.fdg_factory, bn - args.blocks)
+            for g in games:
+                info = get_fdg_game_info(args.l1_rpc, g["transactionHash"])
+                l2output = get_l2output(args.l2_rpc, info["blockNumber"])
+                if l2output != "0x" + info["output"]:
+                    # If the output roots don't match, check if the game is blacklisted
+                    # Game address is in the second topic, where the last 40 characters represent the address
+                    game_topics = g["topics"]
+                    if len(game_topics) >= 2:
+                        # Extract the address part (last 40 characters) from the second topic
+                        topic_data = game_topics[1]
+                        game_address = "0x" + topic_data[-40:]  # Last 40 characters with 0x prefix
+                    else:
+                        logger.warning(f"Could not extract game address from topics: {game_topics}")
+                    
+                    blacklisted = False
+                    
+                    if args.optimism_portal2 and game_address:
+                        blacklisted = is_game_blacklisted(args.l1_rpc, args.optimism_portal2, game_address)
+                        if blacklisted:
+                            logger.info(f"Game {game_address} has output mismatch but is blacklisted, skipping alert")
+                        else:
+                            logger.info(f"Malicious Game {game_address} is not blacklisted")
+                
+                    if not blacklisted:
+                        msg += "error: tx {}, address {}, expected {}, actual {}\n\n".format(
+                            g["transactionHash"], game_address, l2output, info["output"])
+                        errors += 1
 
-        for g in games:
-            info = get_fdg_game_info(args.l1_rpc, g["transactionHash"])
-            l2output = get_l2output(args.l2_rpc, info["blockNumber"])
-            if l2output != "0x" + info["output"]:
-                msg += "error: game {}, expected {}, actual {}\n".format(g["transactionHash"], l2output,info["output"])
-                errors += 1
+            msg += "total {}, successes {}, errors {}".format(len(games), len(games)-errors, errors)
 
-        msg += "total {}, successes {}, errors {}".format(len(games), len(games)-errors, errors)
+            logger.info(msg)
 
-        logger.info(msg)
+            if errors != 0 or time.monotonic()-prev_send > args.force_interval:
+                title = "FDG {}, total {}, successes {}, errors {}".format(args.fdg_factory, len(games), len(games)-errors, errors)
+                send_email(title, msg, args.from_addr, args.to_addr, args.username, args.password)
+                prev_send = time.monotonic()
 
-        if errors != 0 or time.monotonic()-prev_send > args.force_interval:
-            title = "FDG {}, total {}, successes {}, errors {}".format(args.fdg_factory, len(games), len(games)-errors, errors)
-            send_email(title, msg, args.from_addr, args.to_addr, args.username, args.password)
-            prev_send = time.monotonic()
-
-        time.sleep(args.check_interval)
+            time.sleep(args.check_interval)
+    except KeyboardInterrupt:
+        logger.info("Exiting due to keyboard interrupt (Ctrl+C)")
+        # Perform any cleanup here if needed
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        logger.info("Exiting due to keyboard interrupt (Ctrl+C)")

@@ -209,6 +209,9 @@ def main():
                     # If the output roots don't match, check if the game is blacklisted
                     # Game address is in the second topic, where the last 40 characters represent the address
                     game_topics = g["topics"]
+                    # Initialize game_address with a default value in case we can't extract it
+                    game_address = "0x0"
+                    
                     if len(game_topics) >= 2:
                         # Extract the address part (last 40 characters) from the second topic
                         topic_data = game_topics[1]
@@ -218,7 +221,8 @@ def main():
                     
                     blacklisted = False
                     
-                    if args.optimism_portal2 and game_address:
+                    # Only check blacklist if we have a valid game address (not the default)
+                    if args.optimism_portal2 and game_address != "0x0":
                         blacklisted = is_game_blacklisted(args.l1_rpc, args.optimism_portal2, game_address)
                         if blacklisted:
                             logger.info(f"Game {game_address} has output mismatch but is blacklisted, skipping alert")

@@ -32,11 +32,15 @@ def get_blocknumber(url):
         "params": [],
         "id": 1,
     }
-
-    response = requests.post(url, json=payload)
-
-    result = response.json()
-    return int(result['result'], 16)
+    
+    try:
+        response = requests.post(url, json=payload)
+        response.raise_for_status()  # Raises exception for 4XX/5XX responses
+        result = response.json()
+        return int(result['result'], 16)
+    except requests.RequestException as e:
+        logger.error(f"Error in get_blocknumber: {e}")
+        raise
 
 def get_fdg_games(url, addr, from_block):
     payload = {
@@ -45,10 +49,15 @@ def get_fdg_games(url, addr, from_block):
         "params": [{"address": addr, "topics": ["0x5b565efe82411da98814f356d0e7bcb8f0219b8d970307c5afb4a6903a8b2e35"], "fromBlock": hex(from_block), "toBlock": "finalized" }],
         "id": 1,
     }
-
-    response = requests.post(url, json=payload)
-
-    return response.json()["result"]
+    
+    try:
+        response = requests.post(url, json=payload)
+        response.raise_for_status()
+        result = response.json()
+        return result.get("result", [])
+    except requests.RequestException as e:
+        logger.error(f"Error in get_fdg_games: {e}")
+        return []
 
 def get_fdg_game_info(url, txhash):
     payload = {
@@ -57,11 +66,20 @@ def get_fdg_game_info(url, txhash):
         "params": [txhash],
         "id": 1,
     }
-
-    response = requests.post(url, json=payload)
-    input = response.json()["result"]["input"]
-
-    return {"output": input[10+64:10+2*64], "blockNumber": int(input[10+4*64:10+5*64], 16)}
+    
+    try:
+        response = requests.post(url, json=payload)
+        response.raise_for_status()
+        result = response.json()
+        if not result.get("result"):
+            logger.error(f"No result returned for transaction {txhash}")
+            return {"output": "", "blockNumber": 0}
+            
+        input = result["result"]["input"]
+        return {"output": input[10+64:10+2*64], "blockNumber": int(input[10+4*64:10+5*64], 16)}
+    except (requests.RequestException, KeyError, ValueError) as e:
+        logger.error(f"Error in get_fdg_game_info for tx {txhash}: {e}")
+        return {"output": "", "blockNumber": 0}
 
 def get_l2output(url, blocknum):
     payload = {
@@ -70,11 +88,19 @@ def get_l2output(url, blocknum):
         "params": [hex(blocknum)],
         "id": 1,
     }
-
-    response = requests.post(url, json=payload)
-
-    result = response.json()["result"]
-    return result["outputRoot"]
+    
+    try:
+        response = requests.post(url, json=payload)
+        response.raise_for_status()
+        result = response.json()
+        if not result.get("result"):
+            logger.error(f"No result returned for block {blocknum}")
+            return "0x"
+            
+        return result["result"]["outputRoot"]
+    except (requests.RequestException, KeyError) as e:
+        logger.error(f"Error in get_l2output for block {blocknum}: {e}")
+        return "0x"
 
 def is_game_blacklisted(url, portal_address, game_address):
     # Create function signature for disputeGameBlacklist(IDisputeGame)
@@ -96,15 +122,21 @@ def is_game_blacklisted(url, portal_address, game_address):
         "id": 1
     }
     
-    response = requests.post(url, json=payload)
-    result = response.json().get("result", "0x")
-    
-    # If result is 0x00, the game is not blacklisted
-    # If result is 0x01, the game is blacklisted
-    if result == "0x":
-        logger.warning(f"Unexpected result from disputeGameBlacklist: {result}")
-    else:
-        return result.strip() == "0x01" or result.strip() == "0x0000000000000000000000000000000000000000000000000000000000000001"
+    try:
+        response = requests.post(url, json=payload)
+        response.raise_for_status()
+        result = response.json().get("result", "0x")
+        
+        # If result is 0x00, the game is not blacklisted
+        # If result is 0x01, the game is blacklisted
+        if result == "0x":
+            logger.warning(f"Unexpected result from disputeGameBlacklist: {result}")
+            return False
+        else:
+            return result.strip() == "0x01" or result.strip() == "0x0000000000000000000000000000000000000000000000000000000000000001"
+    except requests.RequestException as e:
+        logger.error(f"Error in is_game_blacklisted for game {game_address}: {e}")
+        return False
 
 def send_email(title, msg, from_addr, to_addr, username, password):
     emsg = EmailMessage()
@@ -157,11 +189,21 @@ def main():
             blacklisted_count = 0  # Counter for blacklisted games
             msg = ""
 
-            bn = get_blocknumber(args.l1_rpc)
-            games = get_fdg_games(args.l1_rpc, args.fdg_factory, bn - args.blocks)
+            try:
+                bn = get_blocknumber(args.l1_rpc)
+                games = get_fdg_games(args.l1_rpc, args.fdg_factory, bn - args.blocks)
+            except Exception as e:
+                logger.error(f"Failed to get block number or games: {e}")
+                time.sleep(60)  # Wait a minute before retrying
+                continue
 
             for g in games:
                 info = get_fdg_game_info(args.l1_rpc, g["transactionHash"])
+                # Skip if blockNumber is 0 (indicating an error in getting game info)
+                if info["blockNumber"] == 0 or not info["output"]:
+                    logger.warning(f"Skipping game check due to missing data: {g['transactionHash']}")
+                    continue
+                    
                 l2output = get_l2output(args.l2_rpc, info["blockNumber"])
                 if l2output != "0x" + info["output"]:
                     # If the output roots don't match, check if the game is blacklisted

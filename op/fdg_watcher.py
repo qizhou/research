@@ -162,7 +162,7 @@ def main():
         "--check_interval", type=int, default=15 * 60, help="interval to query"
     )
     parser.add_argument(
-        "--force_interval", type=int, default=None, help="interval to forcibly send update"
+        "--force_interval", type=int, default=3600 * 24, help="interval to forcibly send update"
     )
     parser.add_argument(
         "--blocks", type=int, default=7*7200, help="starting block (now - interval)"

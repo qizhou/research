@@ -171,7 +171,7 @@ def main():
     parser.add_argument("--to_addr", type=str, default="", help="email to address")
     parser.add_argument("--username", type=str, default="", help="email username")
     parser.add_argument("--password", type=str, default="", help="email password")
-    parser.add_argument("--test_email", type=bool, default=False, help="send a test email when start")
+    parser.add_argument("--test_email", action="store_true", help="send a test email when start")
     
     args = parser.parse_args()
 

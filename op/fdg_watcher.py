@@ -187,6 +187,8 @@ def main():
             logger.info("Checking")
             errors = 0
             blacklisted_count = 0  # Counter for blacklisted games
+            skipped_count = 0  # Counter for skipped games due to missing data
+            skipped_games = []  # List to store skipped game transaction hashes
             msg = ""
 
             try:
@@ -202,6 +204,8 @@ def main():
                 # Skip if blockNumber is 0 (indicating an error in getting game info)
                 if info["blockNumber"] == 0 or not info["output"]:
                     logger.warning(f"Skipping game check due to missing data: {g['transactionHash']}")
+                    skipped_count += 1
+                    skipped_games.append(g['transactionHash'])
                     continue
                     
                 l2output = get_l2output(args.l2_rpc, info["blockNumber"])
@@ -235,12 +239,21 @@ def main():
                             g["transactionHash"], game_address, l2output, info["output"])
                         errors += 1
 
-            msg += "total {}, successes {}, errors {}, blacklisted {}".format(len(games), len(games)-errors-blacklisted_count, errors, blacklisted_count)
+            # Add information about skipped games to the message
+            if skipped_count > 0:
+                msg += "Skipped games due to missing data:\n"
+                for tx_hash in skipped_games:
+                    msg += f"- {tx_hash}\n"
+                msg += "\n"
+                
+            msg += "total {}, successes {}, errors {}, blacklisted {}, skipped {}".format(
+                len(games), len(games)-errors-blacklisted_count-skipped_count, errors, blacklisted_count, skipped_count)
 
             logger.info(msg)
 
             if errors != 0 or time.monotonic()-prev_send > args.force_interval:
-                title = "FDG {}, total {}, successes {}, errors {}, blacklisted {}".format(args.fdg_factory, len(games), len(games)-errors-blacklisted_count, errors, blacklisted_count)
+                title = "FDG {}, total {}, successes {}, errors {}, blacklisted {}, skipped {}".format(
+                    args.fdg_factory, len(games), len(games)-errors-blacklisted_count-skipped_count, errors, blacklisted_count, skipped_count)
                 send_email(title, msg, args.from_addr, args.to_addr, args.username, args.password)
                 prev_send = time.monotonic()
 

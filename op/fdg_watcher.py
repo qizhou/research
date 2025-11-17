@@ -165,7 +165,14 @@ def main():
             games = get_fdg_games(args.l1_rpc, args.fdg_factory, bn - args.blocks)
 
             for g in games:
-                info = get_fdg_game_info(args.l1_rpc, g["transactionHash"])                    
+                info = get_fdg_game_info(args.l1_rpc, g["transactionHash"])
+                # Skip if blockNumber is 0 or output is missing
+                if info["blockNumber"] == 0 or not info["output"]:
+                    logger.warning(f"Skipping game check due to missing data: {g['transactionHash']}")                                    
+                    skipped_count += 1
+                    skipped_games.append(g["transactionHash"])
+                    continue
+                
                 l2output = get_l2output(args.l2_rpc, info["blockNumber"])
                 if l2output != "0x" + info["output"]:
                     # If the output roots don't match, check if the game is blacklisted

@@ -152,8 +152,8 @@ def main():
         title = "test email for fdg watcher {}".format(args.fdg_factory)
         send_email(title, "", args.from_addr, args.to_addr, args.username, args.password)
 
-    try:
-        while True:
+    while True:
+        try:
             logger.info("Checking")
             errors = 0
             blacklisted_count = 0  # Counter for blacklisted games
@@ -215,13 +215,16 @@ def main():
                 send_email(title, msg, args.from_addr, args.to_addr, args.username, args.password)
                 prev_send = time.monotonic()
 
-            time.sleep(args.check_interval)
-    except KeyboardInterrupt:
-        logger.info("Exiting due to keyboard interrupt (Ctrl+C)")
-        # Perform any cleanup here if needed
+            logger.info(f"Checking complete. Waiting {args.check_interval} seconds before next check.")
+        except KeyboardInterrupt:
+            logger.info("Exiting due to keyboard interrupt (Ctrl+C)")
+            break  # Exit the while loop on Ctrl+C
+        except Exception as e:
+            logger.error(f"Error in main loop: {str(e)}")
+            logger.info("Continuing to next iteration...")
+        
+        # Sleep is outside the try-except block so it always happens, even after errors
+        time.sleep(args.check_interval)
 
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        logger.info("Exiting due to keyboard interrupt (Ctrl+C)")
+    main()

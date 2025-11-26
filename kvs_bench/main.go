@@ -37,11 +37,16 @@ var dbn = flag.Int("dbn", 1, "number of dbs")
 var dbFlag = flag.String("db", "goleveldb", "db type: goleveldb, pebble, simple, pebblev2")
 var valueFlag = flag.String("V", "fnv", "value generator: fnv, simple")
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
+var printMetics = flag.Bool("metrics", false, "print metrics")
 
 type KeyValueStore interface {
 	ethdb.KeyValueReader
 	ethdb.KeyValueWriter
 	io.Closer
+}
+
+type Metrics interface {
+	MetricsString() string
 }
 
 func generateRandomData(size int, seed uint64) []byte {
@@ -213,4 +218,12 @@ func main() {
 
 	elapsed := time.Since(startTime)
 	fmt.Printf("used time %f, ops %f\n", elapsed.Seconds(), float64(*n)/elapsed.Seconds())
+
+	if *printMetics && *dbFlag == "pebblev2" {
+		for i := 0; i < *dbn; i++ {
+			fmt.Printf("Metrics for db %d\n", i)
+			m := dbs[i].(Metrics)
+			fmt.Print(m.MetricsString())
+		}
+	}
 }

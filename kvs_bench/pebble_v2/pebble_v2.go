@@ -1,6 +1,7 @@
 package pebble_v2
 
 import (
+	"fmt"
 	"runtime"
 
 	"github.com/cockroachdb/pebble"
@@ -130,4 +131,11 @@ func (d *PebbleV2) Delete(key []byte) error {
 // all io accesses to the underlying key-value store.
 func (d *PebbleV2) Close() error {
 	return d.db.Close()
+}
+
+func (d *PebbleV2) MetricsString() string {
+	m := d.db.Metrics()
+	s := m.String()
+	s += fmt.Sprintf("Block cache: hits %d, misses %d\n", m.BlockCache.Hits, m.BlockCache.Misses)
+	return s
 }

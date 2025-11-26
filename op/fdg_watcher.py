@@ -5,6 +5,7 @@ import argparse
 import smtplib
 from email.message import EmailMessage
 
+
 FORMAT = "%(asctime)-15s %(message)s"
 logging.basicConfig(format=FORMAT)
 logging.getLogger("jsonrpcclient.client.request").setLevel(logging.WARNING)
@@ -32,7 +33,7 @@ def get_blocknumber(url):
         "params": [],
         "id": 1,
     }
-    
+
     response = requests.post(url, json=payload)
 
     result = response.json()
@@ -45,7 +46,7 @@ def get_fdg_games(url, addr, from_block):
         "params": [{"address": addr, "topics": ["0x5b565efe82411da98814f356d0e7bcb8f0219b8d970307c5afb4a6903a8b2e35"], "fromBlock": hex(from_block), "toBlock": "finalized" }],
         "id": 1,
     }
-    
+
     response = requests.post(url, json=payload)
 
     return response.json()["result"]
@@ -57,7 +58,7 @@ def get_fdg_game_info(url, txhash):
         "params": [txhash],
         "id": 1,
     }
-    
+
     response = requests.post(url, json=payload)
     input = response.json()["result"]["input"]
 
@@ -70,7 +71,7 @@ def get_l2output(url, blocknum):
         "params": [hex(blocknum)],
         "id": 1,
     }
-    
+
     response = requests.post(url, json=payload)
 
     result = response.json()["result"]
@@ -142,7 +143,6 @@ def main():
     parser.add_argument("--username", type=str, default="", help="email username")
     parser.add_argument("--password", type=str, default="", help="email password")
     parser.add_argument("--test_email", action="store_true", help="send a test email when start")
-    
     args = parser.parse_args()
 
     # prev_balance = None

@@ -214,17 +214,17 @@ class Tree:
         self.root = root
 
 t = Tree()
-t.put(b'\x40'+b'\1'*31, b'\0')   # 0100 0000
+t.put(b'\x40'+b'\1'*31, b'\0')   # b'\x40' -> 0100 0000
 assert t.get(b'\x40'+b'\1'*31) == b'\0'
-t.put(b'\x00'+b'\1'*31, b'\1')   # 0000 0000
+t.put(b'\x00'+b'\1'*31, b'\1')   # b'\x00' -> 0000 0000
 assert t.get(b'\x40'+b'\1'*31) == b'\0'
 assert t.get(b'\x00'+b'\1'*31) == b'\1'
-t.put(b'\xc0'+b'\1'*31, b'\2')   # 1100 0000
+t.put(b'\xc0'+b'\1'*31, b'\2')   # b'\xc0' -> 1100 0000
 assert t.get(b'\x40'+b'\1'*31) == b'\0'
 assert t.get(b'\x00'+b'\1'*31) == b'\1'
 assert t.get(b'\xc0'+b'\1'*31) == b'\2'
 root = t.root
-t.put(b'\x60'+b'\1'*31, b'\3') # 0110 0000 
+t.put(b'\x60'+b'\1'*31, b'\3')   # b'\x60' -> 0110 0000 
 assert t.get(b'\x40'+b'\1'*31) == b'\0'
 assert t.get(b'\x00'+b'\1'*31) == b'\1'
 assert t.get(b'\xc0'+b'\1'*31) == b'\2'

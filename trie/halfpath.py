@@ -14,11 +14,6 @@ class Node:
         self.kind = kind
         self.data = data
 
-def get_nbit(key, pos):
-    b = pos // 8
-    return (key[b] >> (pos % 8)) & 1
-
-
 # the half path based format is implemetn at 
 # https://github.com/NethermindEth/nethermind/blob/master/src/Nethermind/Nethermind.Trie/NodeStorage.cs#L37
 #
@@ -43,11 +38,10 @@ def get_nbit(key, pos):
 # path.Path.BytesAsSpan[..8].CopyTo(pathSpan[1..]); 
 # We use the top `depth` bits of the key here.
 
-# def get_nbit(key, pos):
-#    b = pos >> 3          # pos // 8
-#    shift = 7 - (pos & 7) # 7 - (pos % 8)
-#    return (key[b] >> shift) & 1
-#
+def get_nbit(key, pos):
+   b = pos >> 3          # pos // 8
+   shift = 7 - (pos & 7) # 7 - (pos % 8)
+   return (key[b] >> shift) & 1
 
 def prefix8_from_key_and_depth(key: bytes, depth: int) -> bytes:
     """
@@ -56,27 +50,14 @@ def prefix8_from_key_and_depth(key: bytes, depth: int) -> bytes:
     assert len(key) == 32
     assert 0 <= depth <= 255
 
-#    prefix = int.from_bytes(key[:8], "big")
-#
-#    if depth >= 64:
-#        return prefix.to_bytes(8, "big")
-#
-#    # keep top `depth` bits
-#    mask = ((1 << depth) - 1) << (64 - depth)
-#    prefix &= mask
-#
-#    return prefix.to_bytes(8, "big")
+    prefix = int.from_bytes(key[:8], "big")
 
-#    # the implementation above is same as Nethermind definition 'path.Path.BytesAsSpan[..8].CopyTo(pathSpan[1..]);' 
-#    # but mismatch with '(key[pos // 8] >> (pos % 8)) & 1' so change the following implementation.
-    prefix = 0
-    bits = min(depth, 64)
+    if depth >= 64:
+       return prefix.to_bytes(8, "big")
 
-    for i in range(bits):
-        prefix = (prefix << 1) | get_nbit(key, i)
-
-    # left-align to 64 bits
-    prefix <<= (64 - bits)
+    # keep top `depth` bits
+    mask = ((1 << depth) - 1) << (64 - depth)
+    prefix &= mask
 
     return prefix.to_bytes(8, "big")
 
@@ -233,35 +214,35 @@ class Tree:
         self.root = root
 
 t = Tree()
-t.put(b'\2'+b'\1'*31, b'\0')   # 0000 0010 -> 0100 0000
-assert t.get(b'\2'+b'\1'*31) == b'\0'
-t.put(b'\0'+b'\1'*31, b'\1')   # 0000 0000 -> 0000 0000
-assert t.get(b'\2'+b'\1'*31) == b'\0'
-assert t.get(b'\0'+b'\1'*31) == b'\1'
-t.put(b'\3'+b'\1'*31, b'\2')   # 0000 0011 -> 1100 0000
-assert t.get(b'\2'+b'\1'*31) == b'\0'
-assert t.get(b'\0'+b'\1'*31) == b'\1'
-assert t.get(b'\3'+b'\1'*31) == b'\2'
+t.put(b'\x40'+b'\1'*31, b'\0')   # 0100 0000
+assert t.get(b'\x40'+b'\1'*31) == b'\0'
+t.put(b'\x00'+b'\1'*31, b'\1')   # 0000 0000
+assert t.get(b'\x40'+b'\1'*31) == b'\0'
+assert t.get(b'\x00'+b'\1'*31) == b'\1'
+t.put(b'\xc0'+b'\1'*31, b'\2')   # 1100 0000
+assert t.get(b'\x40'+b'\1'*31) == b'\0'
+assert t.get(b'\x00'+b'\1'*31) == b'\1'
+assert t.get(b'\xc0'+b'\1'*31) == b'\2'
 root = t.root
-t.put(b'\6'+b'\1'*31, b'\3') # 0000 0110 -> 0110 0000 
-assert t.get(b'\2'+b'\1'*31) == b'\0'
-assert t.get(b'\0'+b'\1'*31) == b'\1'
-assert t.get(b'\3'+b'\1'*31) == b'\2'
-assert t.get(b'\6'+b'\1'*31) == b'\3'
+t.put(b'\x60'+b'\1'*31, b'\3') # 0110 0000 
+assert t.get(b'\x40'+b'\1'*31) == b'\0'
+assert t.get(b'\x00'+b'\1'*31) == b'\1'
+assert t.get(b'\xc0'+b'\1'*31) == b'\2'
+assert t.get(b'\x60'+b'\1'*31) == b'\3'
 t.setRoot(root)
-assert t.get(b'\2'+b'\1'*31) == b'\0'
-assert t.get(b'\0'+b'\1'*31) == b'\1'
-assert t.get(b'\3'+b'\1'*31) == b'\2'
-assert t.get(b'\6'+b'\1'*31) == None
+assert t.get(b'\x40'+b'\1'*31) == b'\0'
+assert t.get(b'\x00'+b'\1'*31) == b'\1'
+assert t.get(b'\xc0'+b'\1'*31) == b'\2'
+assert t.get(b'\x60'+b'\1'*31) == None
 
 # test multi-version
-t.put(b'\0'+b'\1'*31, b'\3')
-assert t.get(b'\2'+b'\1'*31) == b'\0'
-assert t.get(b'\0'+b'\1'*31) == b'\3'
-assert t.get(b'\3'+b'\1'*31) == b'\2'
-assert t.get(b'\6'+b'\1'*31) == None
+t.put(b'\x00'+b'\1'*31, b'\3')
+assert t.get(b'\x40'+b'\1'*31) == b'\0'
+assert t.get(b'\x00'+b'\1'*31) == b'\3'
+assert t.get(b'\xc0'+b'\1'*31) == b'\2'
+assert t.get(b'\x60'+b'\1'*31) == None
 t.setRoot(root)
-assert t.get(b'\2'+b'\1'*31) == b'\0'
-assert t.get(b'\0'+b'\1'*31) == b'\1'
-assert t.get(b'\3'+b'\1'*31) == b'\2'
-assert t.get(b'\6'+b'\1'*31) == None
+assert t.get(b'\x40'+b'\1'*31) == b'\0'
+assert t.get(b'\x00'+b'\1'*31) == b'\1'
+assert t.get(b'\xc0'+b'\1'*31) == b'\2'
+assert t.get(b'\x60'+b'\1'*31) == None

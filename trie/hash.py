@@ -83,12 +83,12 @@ class Tree:
                     if get_nbit(key, depth) != get_nbit(existing_leaf_key, depth):
                         break
 
-                if get_nbit(key, common) == 0:
+                if get_nbit(key, depth) == 0:
                     inode_data = leaf_hash + node_key
                 else:
                     inode_data = node_key + leaf_hash
                 inode_key, _ = self.__createInternal(inode_data)
-                for i in range(common-1, depth - 1, -1):
+                for i in range(common-1, depth, -1):
                     if get_nbit(key, i) == 0: 
                         inode_data = inode_key + KEY_NIL
                     else:
@@ -151,25 +151,25 @@ assert t.get(b'\2'+b'\1'*31) == b'\0'
 assert t.get(b'\0'+b'\1'*31) == b'\1'
 assert t.get(b'\3'+b'\1'*31) == b'\2'
 root = t.root
-t.put(b'\6'+b'\1'*31, b'\3')
+t.put(b'\131'+b'\1'*31, b'\3')
 assert t.get(b'\2'+b'\1'*31) == b'\0'
 assert t.get(b'\0'+b'\1'*31) == b'\1'
 assert t.get(b'\3'+b'\1'*31) == b'\2'
-assert t.get(b'\6'+b'\1'*31) == b'\3'
+assert t.get(b'\131'+b'\1'*31) == b'\3'
 t.setRoot(root)
 assert t.get(b'\2'+b'\1'*31) == b'\0'
 assert t.get(b'\0'+b'\1'*31) == b'\1'
 assert t.get(b'\3'+b'\1'*31) == b'\2'
-assert t.get(b'\6'+b'\1'*31) == None
+assert t.get(b'\131'+b'\1'*31) == None
 
 # test multi-version
 t.put(b'\0'+b'\1'*31, b'\3')
 assert t.get(b'\2'+b'\1'*31) == b'\0'
 assert t.get(b'\0'+b'\1'*31) == b'\3'
 assert t.get(b'\3'+b'\1'*31) == b'\2'
-assert t.get(b'\6'+b'\1'*31) == None
+assert t.get(b'\131'+b'\1'*31) == None
 t.setRoot(root)
 assert t.get(b'\2'+b'\1'*31) == b'\0'
 assert t.get(b'\0'+b'\1'*31) == b'\1'
 assert t.get(b'\3'+b'\1'*31) == b'\2'
-assert t.get(b'\6'+b'\1'*31) == None
+assert t.get(b'\131'+b'\1'*31) == None

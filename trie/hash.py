@@ -14,10 +14,13 @@ class Node:
         self.kind = kind
         self.data = data
 
+    def hash(self):
+        return hash_func(self.data)
 
 def get_nbit(key, pos):
-    b = pos // 8
-    return (key[b] >> (pos % 8)) % 2
+   b = pos >> 3          # pos // 8
+   shift = 7 - (pos & 7) # 7 - (pos % 8)
+   return (key[b] >> shift) & 1
 
 
 # a), initial tree
@@ -52,13 +55,13 @@ class Tree:
 
     def __createInternal(self, value):
         node = Node(KIND_INTERNAL, value)
-        key = hash_func(value)
+        key = node.hash()
         self.kv[key] = node
         return key, node
 
     def __createLeaf(self, key, value):
         node = Node(KIND_LEAF, key + value) # TODO: only store the part of the key not used in path
-        hkey = hash_func(key + value)
+        hkey = node.hash()
         self.kv[hkey] = node
         return hkey, node
 
@@ -83,12 +86,12 @@ class Tree:
                     if get_nbit(key, depth) != get_nbit(existing_leaf_key, depth):
                         break
 
-                if get_nbit(key, depth) == 0:
+                if get_nbit(key, common) == 0:
                     inode_data = leaf_hash + node_key
                 else:
                     inode_data = node_key + leaf_hash
                 inode_key, _ = self.__createInternal(inode_data)
-                for i in range(common-1, depth, -1):
+                for i in range(common-1, depth - 1, -1):
                     if get_nbit(key, i) == 0: 
                         inode_data = inode_key + KEY_NIL
                     else:
@@ -141,35 +144,35 @@ class Tree:
 
 
 t = Tree()
-t.put(b'\2'+b'\1'*31, b'\0')
-assert t.get(b'\2'+b'\1'*31) == b'\0'
-t.put(b'\0'+b'\1'*31, b'\1')
-assert t.get(b'\2'+b'\1'*31) == b'\0'
-assert t.get(b'\0'+b'\1'*31) == b'\1'
-t.put(b'\3'+b'\1'*31, b'\2')
-assert t.get(b'\2'+b'\1'*31) == b'\0'
-assert t.get(b'\0'+b'\1'*31) == b'\1'
-assert t.get(b'\3'+b'\1'*31) == b'\2'
+t.put(b'\x40'+b'\1'*31, b'\0')   # b'\x40' -> 0100 0000
+assert t.get(b'\x40'+b'\1'*31) == b'\0'
+t.put(b'\x00'+b'\1'*31, b'\1')   # b'\x00' -> 0000 0000
+assert t.get(b'\x40'+b'\1'*31) == b'\0'
+assert t.get(b'\x00'+b'\1'*31) == b'\1'
+t.put(b'\xc0'+b'\1'*31, b'\2')   # b'\xc0' -> 1100 0000
+assert t.get(b'\x40'+b'\1'*31) == b'\0'
+assert t.get(b'\x00'+b'\1'*31) == b'\1'
+assert t.get(b'\xc0'+b'\1'*31) == b'\2'
 root = t.root
-t.put(b'\131'+b'\1'*31, b'\3')
-assert t.get(b'\2'+b'\1'*31) == b'\0'
-assert t.get(b'\0'+b'\1'*31) == b'\1'
-assert t.get(b'\3'+b'\1'*31) == b'\2'
-assert t.get(b'\131'+b'\1'*31) == b'\3'
+t.put(b'\x60'+b'\1'*31, b'\3')   # b'\x60' -> 0110 0000 
+assert t.get(b'\x40'+b'\1'*31) == b'\0'
+assert t.get(b'\x00'+b'\1'*31) == b'\1'
+assert t.get(b'\xc0'+b'\1'*31) == b'\2'
+assert t.get(b'\x60'+b'\1'*31) == b'\3'
 t.setRoot(root)
-assert t.get(b'\2'+b'\1'*31) == b'\0'
-assert t.get(b'\0'+b'\1'*31) == b'\1'
-assert t.get(b'\3'+b'\1'*31) == b'\2'
-assert t.get(b'\131'+b'\1'*31) == None
+assert t.get(b'\x40'+b'\1'*31) == b'\0'
+assert t.get(b'\x00'+b'\1'*31) == b'\1'
+assert t.get(b'\xc0'+b'\1'*31) == b'\2'
+assert t.get(b'\x60'+b'\1'*31) == None
 
 # test multi-version
-t.put(b'\0'+b'\1'*31, b'\3')
-assert t.get(b'\2'+b'\1'*31) == b'\0'
-assert t.get(b'\0'+b'\1'*31) == b'\3'
-assert t.get(b'\3'+b'\1'*31) == b'\2'
-assert t.get(b'\131'+b'\1'*31) == None
+t.put(b'\x00'+b'\1'*31, b'\3')
+assert t.get(b'\x40'+b'\1'*31) == b'\0'
+assert t.get(b'\x00'+b'\1'*31) == b'\3'
+assert t.get(b'\xc0'+b'\1'*31) == b'\2'
+assert t.get(b'\x60'+b'\1'*31) == None
 t.setRoot(root)
-assert t.get(b'\2'+b'\1'*31) == b'\0'
-assert t.get(b'\0'+b'\1'*31) == b'\1'
-assert t.get(b'\3'+b'\1'*31) == b'\2'
-assert t.get(b'\131'+b'\1'*31) == None
+assert t.get(b'\x40'+b'\1'*31) == b'\0'
+assert t.get(b'\x00'+b'\1'*31) == b'\1'
+assert t.get(b'\xc0'+b'\1'*31) == b'\2'
+assert t.get(b'\x60'+b'\1'*31) == None

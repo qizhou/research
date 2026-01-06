@@ -19,8 +19,9 @@ class Node:
         return hash_func(self.data)
 
 def get_nbit(key, pos):
-    b = pos // 8
-    return (key[b] >> (pos % 8)) % 2
+   b = pos >> 3          # pos // 8
+   shift = 7 - (pos & 7) # 7 - (pos % 8)
+   return (key[b] >> shift) & 1
 
 # a), initial tree
 #  root=internal('0'*32 + '0'*32)
@@ -57,9 +58,11 @@ def get_nbit(key, pos):
 #  n0=leaf(h0+d0), n1=leaf(h1+d1)
 #  key '' => root
 #  key '0' => inode0
+#  key '00' => n1
 #  key '01' => inode1
-#  key '010' => n1
-#  key '011' => n0
+#  key '010' => n0
+#  key '011' => n3
+#  key '1' => n2
 
 class Tree:
     def __init__(self, kv=None):
@@ -195,46 +198,50 @@ class OptimizedTree:
 def test_tree(tree_func):
     t = tree_func()
     t1 = hash.Tree()
-    t.put(b'\2'+b'\1'*31, b'\0')
-    t1.put(b'\2'+b'\1'*31, b'\0')
-    assert t.get(b'\2'+b'\1'*31) == b'\0'
+    # b'\x40' -> 0100 0000
+    t.put(b'\x40'+b'\1'*31, b'\0')
+    t1.put(b'\x40'+b'\1'*31, b'\0')
+    assert t.get(b'\x40'+b'\1'*31) == b'\0'
     assert t.root == t1.root
-    t.put(b'\0'+b'\1'*31, b'\1')
-    t1.put(b'\0'+b'\1'*31, b'\1')
-    assert t.get(b'\2'+b'\1'*31) == b'\0'
-    assert t.get(b'\0'+b'\1'*31) == b'\1'
+    # b'\x00' -> 0000 0000
+    t.put(b'\x00'+b'\1'*31, b'\1')
+    t1.put(b'\x00'+b'\1'*31, b'\1')
+    assert t.get(b'\x40'+b'\1'*31) == b'\0'
+    assert t.get(b'\x00'+b'\1'*31) == b'\1'
     assert t.root == t1.root
-    t.put(b'\3'+b'\1'*31, b'\2')
-    t1.put(b'\3'+b'\1'*31, b'\2')
-    assert t.get(b'\2'+b'\1'*31) == b'\0'
-    assert t.get(b'\0'+b'\1'*31) == b'\1'
-    assert t.get(b'\3'+b'\1'*31) == b'\2'
+    # b'\xc0' -> 1100 0000
+    t.put(b'\xc0'+b'\1'*31, b'\2')
+    t1.put(b'\xc0'+b'\1'*31, b'\2')
+    assert t.get(b'\x40'+b'\1'*31) == b'\0'
+    assert t.get(b'\x00'+b'\1'*31) == b'\1'
+    assert t.get(b'\xc0'+b'\1'*31) == b'\2'
     snapshot = dict(t.kv)
     root1 = t1.root
     assert t.root == t1.root
-    t.put(b'\131'+b'\1'*31, b'\3')
-    t1.put(b'\131'+b'\1'*31, b'\3')
-    assert t.get(b'\2'+b'\1'*31) == b'\0'
-    assert t.get(b'\0'+b'\1'*31) == b'\1'
-    assert t.get(b'\3'+b'\1'*31) == b'\2'
-    assert t.get(b'\131'+b'\1'*31) == b'\3'
+    # b'\x60' -> 0110 0000 
+    t.put(b'\x60'+b'\1'*31, b'\3')
+    t1.put(b'\x60'+b'\1'*31, b'\3')
+    assert t.get(b'\x40'+b'\1'*31) == b'\0'
+    assert t.get(b'\x00'+b'\1'*31) == b'\1'
+    assert t.get(b'\xc0'+b'\1'*31) == b'\2'
+    assert t.get(b'\x60'+b'\1'*31) == b'\3'
     assert t.root == t1.root
 
     t = tree_func(snapshot)
     t1.setRoot(root1)
-    assert t.get(b'\2'+b'\1'*31) == b'\0'
-    assert t.get(b'\0'+b'\1'*31) == b'\1'
-    assert t.get(b'\3'+b'\1'*31) == b'\2'
-    assert t.get(b'\131'+b'\1'*31) == None
+    assert t.get(b'\x40'+b'\1'*31) == b'\0'
+    assert t.get(b'\x00'+b'\1'*31) == b'\1'
+    assert t.get(b'\xc0'+b'\1'*31) == b'\2'
+    assert t.get(b'\x60'+b'\1'*31) == None
     assert t.root == t1.root
 
     # test multi-version
-    t.put(b'\0'+b'\1'*31, b'\3')
-    t1.put(b'\0'+b'\1'*31, b'\3')
-    assert t.get(b'\2'+b'\1'*31) == b'\0'
-    assert t.get(b'\0'+b'\1'*31) == b'\3'
-    assert t.get(b'\3'+b'\1'*31) == b'\2'
-    assert t.get(b'\131'+b'\1'*31) == None
+    t.put(b'\x00'+b'\1'*31, b'\3')
+    t1.put(b'\x00'+b'\1'*31, b'\3')
+    assert t.get(b'\x40'+b'\1'*31) == b'\0'
+    assert t.get(b'\x00'+b'\1'*31) == b'\3'
+    assert t.get(b'\xc0'+b'\1'*31) == b'\2'
+    assert t.get(b'\x60'+b'\1'*31) == None
     assert t.root == t1.root
 
 test_tree(Tree)
